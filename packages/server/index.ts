@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
+import helmet from 'helmet';
 import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth';
@@ -12,6 +13,7 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(cors());
+app.use(helmet());
 
 // Better Auth handler — must be registered before express.json()
 app.all('/api/auth/{*any}', (req: Request, res: Response, next) => {
