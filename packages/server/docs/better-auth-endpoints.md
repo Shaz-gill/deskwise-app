@@ -79,3 +79,45 @@ Registered by Better Auth's core, but **no social providers are configured**, so
 ## Protecting routes
 
 Use `requireAuth` from `packages/server/middleware/require-auth.ts` on any route that needs a signed-in user — it calls `auth.api.getSession`, attaches `req.user`/`req.session` (typed in `packages/server/express.d.ts`), and returns `401` if there's no session. `GET /api/me` is the first example of this pattern.
+
+## Testing with curl
+
+There's no self-signup (`disableSignUp: true`), so testing requires a pre-provisioned user — e.g. the admin created by `bun run seed` (see `packages/server/prisma/scripts/seed.ts`, credentials from `ADMIN_EMAIL`/`ADMIN_PASSWORD` in `.env`).
+
+**1. Sign in and save the session cookie to a jar file:**
+
+```bash
+curl -i -c /tmp/cookies.txt -X POST http://localhost:3000/api/auth/sign-in/email \
+  -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"YOUR_PASSWORD"}'
+```
+
+A `200` response sets `Set-Cookie: better-auth.session_token=...` and returns the user object in the body:
+
+```json
+{"redirect":false,"token":"...","user":{"name":"Admin","email":"admin@example.com","emailVerified":true,...}}
+```
+
+**2. Call a protected route using that cookie:**
+
+```bash
+curl -i -b /tmp/cookies.txt http://localhost:3000/api/me
+```
+
+Returns `{"user": {...}, "session": {...}}` — verified working against `GET /api/me`.
+
+**3. Confirm it's actually enforced (no cookie → 401):**
+
+```bash
+curl -i http://localhost:3000/api/me
+```
+
+**Other useful checks:**
+
+```bash
+# Inspect the session directly via Better Auth
+curl -i -b /tmp/cookies.txt http://localhost:3000/api/auth/get-session
+
+# Sign out (revokes the session)
+curl -i -b /tmp/cookies.txt -X POST http://localhost:3000/api/auth/sign-out
+```
