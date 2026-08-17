@@ -1,3 +1,4 @@
+/* Tailwind v4's entire setup is this one import — no tailwind.config.js. */
 @import 'tailwindcss';
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';

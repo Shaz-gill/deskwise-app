@@ -12,4 +12,12 @@ export const auth = betterAuth({
       disableSignUp: true,
    },
    trustedOrigins: process.env.TRUSTED_ORIGINS?.split(','),
+   user: {
+      additionalFields: {
+         role: {
+            type: 'string',
+            input: false,
+         },
+      },
+   },
 });

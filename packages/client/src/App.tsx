@@ -1,22 +1,45 @@
-import { Navigate, Route, Routes } from 'react-router';
-
-import { RequireAuth } from '@/components/require-auth';
-import { HomePage } from '@/pages/home-page';
-import { LoginPage } from '@/pages/login-page';
+import { Route, Routes } from 'react-router-dom';
+import { AdminRoute } from './components/AdminRoute';
+import { GuestRoute } from './components/GuestRoute';
+import { Layout } from './components/Layout';
+import { ProtectedRoute } from './components/ProtectedRoute';
+import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
+import { UsersPage } from './pages/UsersPage';
 
 function App() {
    return (
       <Routes>
-         <Route path="/login" element={<LoginPage />} />
+         <Route
+            path="/login"
+            element={
+               <GuestRoute>
+                  <LoginPage />
+               </GuestRoute>
+            }
+         />
          <Route
             path="/"
             element={
-               <RequireAuth>
-                  <HomePage />
-               </RequireAuth>
+               <ProtectedRoute>
+                  <Layout>
+                     <HomePage />
+                  </Layout>
+               </ProtectedRoute>
             }
          />
-         <Route path="*" element={<Navigate to="/" replace />} />
+         <Route
+            path="/users"
+            element={
+               <ProtectedRoute>
+                  <AdminRoute>
+                     <Layout>
+                        <UsersPage />
+                     </Layout>
+                  </AdminRoute>
+               </ProtectedRoute>
+            }
+         />
       </Routes>
    );
 }
