@@ -23,8 +23,6 @@ import {
 } from '../components/ui/field';
 import { Input } from '../components/ui/input';
 
-// Colocated here since this is the only form in the app so far — pull
-// this into a shared schemas module once more forms need one.
 const loginSchema = z.object({
    email: z.string().min(1, 'Email is required').email('Enter a valid email'),
    password: z.string().min(1, 'Password is required'),
@@ -34,8 +32,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 export function LoginPage() {
    const navigate = useNavigate();
    const { refetch } = authClient.useSession();
-   // Separate from RHF's field errors — this is a server-side sign-in
-   // failure (bad credentials), not a per-field validation error.
    const [serverError, setServerError] = useState<string | null>(null);
 
    const {
@@ -56,9 +52,6 @@ export function LoginPage() {
          return;
       }
 
-      // Force the shared session cache to refresh before navigating —
-      // otherwise ProtectedRoute can read the stale pre-login value on
-      // its first render and bounce straight back to /login.
       await refetch();
       navigate('/', { replace: true });
    }
@@ -76,16 +69,7 @@ export function LoginPage() {
                </CardDescription>
             </CardHeader>
             <CardContent>
-               <form
-                  onSubmit={handleSubmit(onSubmit)}
-                  // Disable the browser's native constraint validation (e.g.
-                  // for type="email") so zod is the single source of
-                  // validation messages — otherwise a malformed email on a
-                  // fresh submit gets blocked by the browser's own tooltip
-                  // before RHF/zod ever run, and our custom error never
-                  // renders.
-                  noValidate
-               >
+               <form onSubmit={handleSubmit(onSubmit)} noValidate>
                   <FieldGroup>
                      {serverError && (
                         <Alert variant="destructive">

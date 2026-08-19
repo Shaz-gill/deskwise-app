@@ -1,8 +1,8 @@
 import { Route, Routes } from 'react-router-dom';
-import { AdminRoute } from './components/AdminRoute';
-import { GuestRoute } from './components/GuestRoute';
+import { AdminRoute } from './components/routes/AdminRoute';
+import { GuestRoute } from './components/routes/GuestRoute';
 import { Layout } from './components/Layout';
-import { ProtectedRoute } from './components/ProtectedRoute';
+import { ProtectedRoute } from './components/routes/ProtectedRoute';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { UsersPage } from './pages/UsersPage';
