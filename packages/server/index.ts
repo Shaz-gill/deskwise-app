@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth';
 import { requireAuth } from './middleware/require-auth';
+import { authLimiter } from './middleware/auth-limiter';
 
 dotenv.config();
 
@@ -16,9 +17,13 @@ app.use(cors());
 app.use(helmet());
 
 // Better Auth handler — must be registered before express.json()
-app.all('/api/auth/{*any}', (req: Request, res: Response, next) => {
-   toNodeHandler(auth)(req, res).catch(next);
-});
+app.all(
+   '/api/auth/{*any}',
+   authLimiter,
+   (req: Request, res: Response, next) => {
+      toNodeHandler(auth)(req, res).catch(next);
+   }
+);
 
 app.use(express.json());
 
