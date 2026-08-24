@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { hashPassword } from 'better-auth/crypto';
-import { createUserSchema, editUserSchema } from '../../core';
+import { createUserSchema, editUserSchema } from 'core';
 import prisma from '../db';
 import { Prisma } from '../generated/prisma/client';
 import { Role } from '../generated/prisma/enums';
