@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
+import moment from 'moment';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Skeleton } from '../components/ui/skeleton';
 import {
@@ -51,7 +52,7 @@ const columns: ColumnDef<ApiUser>[] = [
       accessorKey: 'createdAt',
       header: 'Joined',
       cell: ({ row }) =>
-         new Date(row.getValue('createdAt')).toLocaleDateString(),
+         moment(row.getValue<string>('createdAt')).format('MMM D, YYYY'),
    },
    {
       id: 'actions',
