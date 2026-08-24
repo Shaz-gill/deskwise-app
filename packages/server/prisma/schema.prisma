@@ -14,7 +14,7 @@ datasource db {
 
 enum Role {
   admin
-  agent
+  user
 }
 
 model User {
@@ -23,7 +23,7 @@ model User {
   email         String
   emailVerified Boolean   @default(false)
   image         String?
-  role          Role      @default(agent)
+  role          Role      @default(user)
   deletedAt     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt

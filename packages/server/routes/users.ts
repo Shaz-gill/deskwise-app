@@ -63,7 +63,7 @@ usersRouter.post(
                name,
                email,
                emailVerified: true,
-               role: Role.agent,
+               role: Role.user,
                createdAt: now,
                updatedAt: now,
                accounts: {
@@ -205,7 +205,14 @@ usersRouter.delete(
          await prisma.$transaction([
             prisma.user.update({
                where: { id: userId },
-               data: { deletedAt: new Date() },
+               data: {
+                  deletedAt: new Date(),
+                  // Frees the original email for reuse by a new account —
+                  // the user row (id/name/role) sticks around for ticket
+                  // history, but its email no longer occupies the unique
+                  // constraint.
+                  email: `deleted+${userId}@deskwise.invalid`,
+               },
             }),
             prisma.session.deleteMany({ where: { userId } }),
          ]);

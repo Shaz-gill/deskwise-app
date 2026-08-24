@@ -19,7 +19,7 @@ export type ApiUser = {
    id: string;
    name: string;
    email: string;
-   role: 'admin' | 'agent';
+   role: 'admin' | 'user';
    createdAt: string; // ISO string over the wire
 };
 

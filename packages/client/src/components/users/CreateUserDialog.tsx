@@ -19,7 +19,7 @@ async function createUser(values: CreateUserFormValues): Promise<ApiUser> {
 
 // Trigger button + modal form for admin-created users — used as
 // UsersPage's DataTable `toolbarActions`. New users always get the
-// server's default role ('agent') — there's no role picker here.
+// server's default role ('user') — there's no role picker here.
 export function CreateUserDialog() {
    const queryClient = useQueryClient();
    const [open, setOpen] = useState(false);
@@ -65,7 +65,7 @@ export function CreateUserDialog() {
       <UserFormDialog
          trigger={<Button>Create User</Button>}
          title="Create User"
-         description="Add a new agent account. They'll be able to sign in immediately with the email and password you set here."
+         description="Add a new user account. They'll be able to sign in immediately with the email and password you set here."
          open={open}
          onOpenChange={handleOpenChange}
          onFormSubmit={handleSubmit(onSubmit)}
