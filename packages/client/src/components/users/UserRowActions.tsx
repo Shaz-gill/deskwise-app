@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MoreVerticalIcon } from 'lucide-react';
+import { Role } from 'core';
 import type { ApiUser } from '../../pages/UsersPage';
 import { Button } from '../ui/button';
 import {
@@ -32,7 +33,7 @@ export function UserRowActions({ user }: { user: ApiUser }) {
                </DropdownMenuItem>
                <DropdownMenuItem
                   variant="destructive"
-                  disabled={user.role === 'admin'}
+                  disabled={user.role === Role.admin}
                   onClick={() => setDeleteOpen(true)}
                >
                   Delete

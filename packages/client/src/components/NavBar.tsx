@@ -1,5 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { MoonIcon, SunIcon } from 'lucide-react';
+import { Role } from 'core';
 import { authClient } from '../lib/auth-client';
 import { cn } from '../lib/utils';
 import { PAGE_CONTAINER } from '../lib/layout';
@@ -28,7 +29,7 @@ export function NavBar() {
          >
             <div className="flex items-center gap-6">
                <Logo size="sm" />
-               {data?.user?.role === 'admin' && (
+               {data?.user?.role === Role.admin && (
                   <Link
                      to="/users"
                      className="text-sm font-medium text-muted-foreground hover:text-foreground"

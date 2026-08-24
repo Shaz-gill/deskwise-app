@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
+import { Role } from 'core';
 import { authClient } from '../../lib/auth-client';
 
 // Narrows a route already behind ProtectedRoute (so a session and its
@@ -8,7 +9,7 @@ import { authClient } from '../../lib/auth-client';
 export function AdminRoute({ children }: { children: ReactNode }) {
    const { data } = authClient.useSession();
 
-   if (data?.user?.role !== 'admin') {
+   if (data?.user?.role !== Role.admin) {
       return <Navigate to="/" replace />;
    }
 

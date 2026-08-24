@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
 import moment from 'moment';
+import { Role } from 'core';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Skeleton } from '../components/ui/skeleton';
 import {
@@ -20,7 +21,7 @@ export type ApiUser = {
    id: string;
    name: string;
    email: string;
-   role: 'admin' | 'user';
+   role: Role;
    createdAt: string; // ISO string over the wire
 };
 
