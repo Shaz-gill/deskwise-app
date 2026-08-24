@@ -1,10 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
+import { loginSchema, type LoginFormValues } from 'core';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { loginSchema, type LoginFormValues } from 'core';
 import { Logo } from '../components/Logo';
-import { authClient } from '../lib/auth-client';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Button } from '../components/ui/button';
 import {
@@ -22,6 +21,7 @@ import {
    FieldLabel,
 } from '../components/ui/field';
 import { Input } from '../components/ui/input';
+import { authClient } from '../lib/auth-client';
 
 export function LoginPage() {
    const navigate = useNavigate();

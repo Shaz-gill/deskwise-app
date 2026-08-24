@@ -1,8 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import type { ColumnDef } from '@tanstack/react-table';
 import axios from 'axios';
-import moment from 'moment';
 import { Role } from 'core';
+import moment from 'moment';
+import { DataTable } from '../components/data-table';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Skeleton } from '../components/ui/skeleton';
 import {
@@ -15,7 +16,6 @@ import {
 } from '../components/ui/table';
 import { CreateUserDialog } from '../components/users/CreateUserDialog';
 import { UserRowActions } from '../components/users/UserRowActions';
-import { DataTable } from '../components/data-table';
 
 export type ApiUser = {
    id: string;

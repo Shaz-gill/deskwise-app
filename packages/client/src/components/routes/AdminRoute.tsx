@@ -1,6 +1,6 @@
+import { Role } from 'core';
 import type { ReactNode } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Role } from 'core';
 import { authClient } from '../../lib/auth-client';
 
 // Narrows a route already behind ProtectedRoute (so a session and its

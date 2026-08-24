@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
 import axios from 'axios';
+import { useEffect } from 'react';
 import type { ApiUser } from '../../pages/UsersPage';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Button } from '../ui/button';

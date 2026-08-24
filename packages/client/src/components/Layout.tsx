@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
-import { cn } from '../lib/utils';
 import { PAGE_CONTAINER } from '../lib/layout';
+import { cn } from '../lib/utils';
 import { NavBar } from './NavBar';
 
 export function Layout({ children }: { children: ReactNode }) {

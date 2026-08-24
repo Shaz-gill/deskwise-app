@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { MoreVerticalIcon } from 'lucide-react';
 import { Role } from 'core';
+import { MoreVerticalIcon } from 'lucide-react';
+import { useState } from 'react';
 import type { ApiUser } from '../../pages/UsersPage';
 import { Button } from '../ui/button';
 import {

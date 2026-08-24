@@ -1,9 +1,9 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { editUserSchema, type EditUserFormValues } from 'core';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
 import type { ApiUser } from '../../pages/UsersPage';
 import { UserFormDialog } from './UserFormDialog';
 import { UserFormFields } from './UserFormFields';

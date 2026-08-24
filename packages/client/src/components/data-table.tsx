@@ -1,4 +1,3 @@
-import * as React from 'react';
 import {
    type ColumnDef,
    type ColumnFiltersState,
@@ -9,15 +8,16 @@ import {
    getPaginationRowModel,
    useReactTable,
 } from '@tanstack/react-table';
+import * as React from 'react';
 
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import {
    DropdownMenu,
    DropdownMenuCheckboxItem,
    DropdownMenuContent,
    DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
    Table,
    TableBody,
