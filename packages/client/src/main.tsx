@@ -1,15 +1,18 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import './index.css';
 import App from './App.tsx';
 
-// BrowserRouter must wrap App for react-router-dom's hooks (useNavigate,
-// <Navigate>, <Route>, etc.) to work anywhere in the component tree.
+const queryClient = new QueryClient();
+
 createRoot(document.getElementById('root')!).render(
    <StrictMode>
-      <BrowserRouter>
-         <App />
-      </BrowserRouter>
+      <QueryClientProvider client={queryClient}>
+         <BrowserRouter>
+            <App />
+         </BrowserRouter>
+      </QueryClientProvider>
    </StrictMode>
 );

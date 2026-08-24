@@ -1,10 +1,6 @@
-// Single source of truth for the Deskwise mark, used at two sizes:
-// 'sm' in NavBar (compact, inline with nav content) and 'lg' on
-// LoginPage (standalone, above the sign-in card). A size prop keeps
-// both call sites in sync instead of drifting as two separate markups.
 export function Logo({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
-   const badge = size === 'lg' ? 'h-12 w-12' : 'h-8 w-8';
-   const icon = size === 'lg' ? 'h-6 w-6' : 'h-4 w-4';
+   const badge = size === 'lg' ? 'h-10 w-10' : 'h-7 w-7';
+   const icon = size === 'lg' ? 'h-5 w-5' : 'h-3.5 w-3.5';
    const text = size === 'lg' ? 'text-2xl' : 'text-lg';
 
    return (

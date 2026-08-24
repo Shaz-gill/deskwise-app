@@ -2,7 +2,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { z } from 'zod';
+import { loginSchema, type LoginFormValues } from 'core';
 import { Logo } from '../components/Logo';
 import { authClient } from '../lib/auth-client';
 import { Alert, AlertDescription } from '../components/ui/alert';
@@ -23,12 +23,6 @@ import {
 } from '../components/ui/field';
 import { Input } from '../components/ui/input';
 
-const loginSchema = z.object({
-   email: z.string().min(1, 'Email is required').email('Enter a valid email'),
-   password: z.string().min(1, 'Password is required'),
-});
-type LoginFormValues = z.infer<typeof loginSchema>;
-
 export function LoginPage() {
    const navigate = useNavigate();
    const { refetch } = authClient.useSession();
@@ -40,6 +34,10 @@ export function LoginPage() {
       formState: { errors, isSubmitting },
    } = useForm<LoginFormValues>({
       resolver: zodResolver(loginSchema),
+      defaultValues: {
+         email: '',
+         password: '',
+      },
    });
 
    async function onSubmit({ email, password }: LoginFormValues) {

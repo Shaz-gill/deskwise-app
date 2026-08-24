@@ -1,10 +1,10 @@
-import { Route, Routes } from 'react-router-dom';
-import { AdminRoute } from './components/routes/AdminRoute';
-import { GuestRoute } from './components/routes/GuestRoute';
-import { Layout } from './components/Layout';
+import { Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './components/routes/ProtectedRoute';
-import { HomePage } from './pages/HomePage';
+import { GuestRoute } from './components/routes/GuestRoute';
+import { AdminRoute } from './components/routes/AdminRoute';
+import { Layout } from './components/Layout';
 import { LoginPage } from './pages/LoginPage';
+import { HomePage } from './pages/HomePage';
 import { UsersPage } from './pages/UsersPage';
 
 function App() {
