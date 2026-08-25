@@ -1,11 +1,6 @@
 import { rateLimit } from 'express-rate-limit';
 
-const CREDENTIAL_PATHS = [
-   '/sign-in',
-   '/sign-up',
-   '/change-password',
-   '/change-email',
-];
+const CREDENTIAL_PATHS = ['/sign-in'];
 
 export const authLimiter = rateLimit({
    windowMs: 15 * 60 * 1000,

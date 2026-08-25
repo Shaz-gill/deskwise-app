@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth';
 import { createAuthMiddleware, APIError } from 'better-auth/api';
 import { prismaAdapter } from 'better-auth/adapters/prisma';
 import prisma from '../db';
+import { Role } from '../generated/prisma/enums';
 import { trustedOrigins } from './trusted-origins';
 
 export const auth = betterAuth({
@@ -22,7 +23,7 @@ export const auth = betterAuth({
          role: {
             type: 'string',
             required: true,
-            defaultValue: 'user',
+            defaultValue: Role.user,
             input: false,
          },
       },
