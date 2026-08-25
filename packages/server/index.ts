@@ -6,6 +6,7 @@ import helmet from 'helmet';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth';
 import { authLimiter } from './middleware/auth-limiter';
+import { errorHandler } from './middleware/error-handler';
 import { isTrustedOrigin } from './lib/trusted-origins';
 import { usersRouter } from './routes/users';
 
@@ -42,6 +43,8 @@ app.all(
 app.use(express.json());
 
 app.use('/api/users', usersRouter);
+
+app.use(errorHandler);
 
 app.listen(port, () => {
    console.log(`Server is running on http://localhost:${port}`);
