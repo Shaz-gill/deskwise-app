@@ -5,6 +5,7 @@ import { Role } from 'core';
 import moment from 'moment';
 import { DataTable } from '../components/data-table';
 import { Alert, AlertDescription } from '../components/ui/alert';
+import { Badge } from '../components/ui/badge';
 import { Skeleton } from '../components/ui/skeleton';
 import {
    Table,
@@ -45,9 +46,17 @@ const columns: ColumnDef<ApiUser>[] = [
    {
       accessorKey: 'role',
       header: 'Role',
-      cell: ({ row }) => (
-         <span className="capitalize">{row.getValue('role')}</span>
-      ),
+      cell: ({ row }) => {
+         const role = row.getValue<Role>('role');
+         return (
+            <Badge
+               variant={role === Role.admin ? 'default' : 'secondary'}
+               className="capitalize"
+            >
+               {role}
+            </Badge>
+         );
+      },
    },
    {
       accessorKey: 'createdAt',
