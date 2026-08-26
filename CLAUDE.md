@@ -36,6 +36,10 @@ No test framework is configured in either package yet.
 
 A husky `pre-commit` hook runs `lint-staged`, which runs `prettier --write` on staged `*.{js,jsx,ts,tsx,css}` files.
 
+## Workflow
+
+Don't `git commit` or `git push` unless explicitly asked in that turn — implement/edit freely, but leave changes uncommitted until the user says to commit (and pushes go straight to `origin/master`, no branch/PR flow, since this is a solo project).
+
 ## Architecture
 
 - Bun workspaces: root `package.json` declares `packages/*` as workspaces; `server` and `client` are independent, tied together only by the root `index.ts` dev orchestrator.
