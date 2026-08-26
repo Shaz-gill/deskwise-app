@@ -1,8 +1,9 @@
-import { useQuery } from '@tanstack/react-query';
-import type { ColumnDef } from '@tanstack/react-table';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import type { ColumnDef, PaginationState } from '@tanstack/react-table';
 import axios from 'axios';
 import { Role } from 'core';
 import moment from 'moment';
+import { useState } from 'react';
 import { DataTable } from '../components/data-table';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
@@ -26,12 +27,28 @@ export type ApiUser = {
    createdAt: string; // ISO string over the wire
 };
 
-async function fetchUsers(): Promise<ApiUser[]> {
-   const { data } = await axios.get<{ users: ApiUser[] }>('/api/users', {
+type UsersResponse = {
+   users: ApiUser[];
+   total: number;
+   page: number;
+   pageSize: number;
+};
+
+async function fetchUsers(params: {
+   page: number;
+   pageSize: number;
+   search: string;
+}): Promise<UsersResponse> {
+   const { data } = await axios.get<UsersResponse>('/api/users', {
       withCredentials: true,
+      params: {
+         page: params.page,
+         pageSize: params.pageSize,
+         ...(params.search && { search: params.search }),
+      },
    });
 
-   return data.users;
+   return data;
 }
 
 const columns: ColumnDef<ApiUser>[] = [
@@ -73,6 +90,7 @@ const columns: ColumnDef<ApiUser>[] = [
 ];
 
 const SKELETON_ROW_COUNT = 5;
+const DEFAULT_PAGE_SIZE = 10;
 
 function UsersTableHeader() {
    return (
@@ -89,13 +107,21 @@ function UsersTableHeader() {
 }
 
 export function UsersPage() {
-   const {
-      data: users,
-      isPending,
-      isError,
-   } = useQuery({
-      queryKey: ['users'],
-      queryFn: fetchUsers,
+   const [pagination, setPagination] = useState<PaginationState>({
+      pageIndex: 0,
+      pageSize: DEFAULT_PAGE_SIZE,
+   });
+   const [search, setSearch] = useState('');
+
+   const { data, isPending, isError } = useQuery({
+      queryKey: ['users', pagination.pageIndex, pagination.pageSize, search],
+      queryFn: () =>
+         fetchUsers({
+            page: pagination.pageIndex + 1,
+            pageSize: pagination.pageSize,
+            search,
+         }),
+      placeholderData: keepPreviousData,
    });
 
    return (
@@ -139,12 +165,18 @@ export function UsersPage() {
             </Alert>
          )}
 
-         {users && (
+         {data && (
             <DataTable
                columns={columns}
-               data={users}
-               filterColumn="email"
-               filterPlaceholder="Filter emails..."
+               data={data.users}
+               total={data.total}
+               pagination={pagination}
+               onPaginationChange={setPagination}
+               onSearchChange={(value) => {
+                  setSearch(value);
+                  setPagination((p) => ({ ...p, pageIndex: 0 }));
+               }}
+               searchPlaceholder="Search emails..."
                toolbarActions={<CreateUserDialog />}
             />
          )}

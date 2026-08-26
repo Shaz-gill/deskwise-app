@@ -1,11 +1,10 @@
 import {
    type ColumnDef,
-   type ColumnFiltersState,
+   type OnChangeFn,
+   type PaginationState,
    type VisibilityState,
    flexRender,
    getCoreRowModel,
-   getFilteredRowModel,
-   getPaginationRowModel,
    useReactTable,
 } from '@tanstack/react-table';
 import * as React from 'react';
@@ -27,20 +26,25 @@ import {
    TableRow,
 } from './ui/table';
 
+const SEARCH_DEBOUNCE_MS = 300;
+
 // Generic shadcn/TanStack Table wrapper — column definitions and data stay
-// with whichever page uses it (see UsersPage.tsx). Owns filtering (single
-// column, via `filterColumn`), column-visibility toggling, and pagination
-// (Previous/Next, default page size). No sorting yet; add via TanStack
-// Table's `getSortedRowModel()` when a page needs it.
+// with whichever page uses it (see UsersPage.tsx). Pagination and search
+// are server-driven (manual mode): the caller owns `pagination`/`total`
+// state and re-fetches `data` on change, this component just renders
+// controls and debounces the search input. Also owns column-visibility
+// toggling. No sorting yet; add via TanStack Table's `getSortedRowModel()`
+// when a page needs it.
 interface DataTableProps<TData, TValue> {
    columns: ColumnDef<TData, TValue>[];
    data: TData[];
-   // Column id to filter on via the search input, and its placeholder —
-   // optional and generic (not hardcoded to "email") so this stays
-   // reusable for a future table filtering a different column. Omit to
-   // skip rendering the search input entirely.
-   filterColumn?: string;
-   filterPlaceholder?: string;
+   total: number;
+   pagination: PaginationState;
+   onPaginationChange: OnChangeFn<PaginationState>;
+   // Debounced free-text search sent to the server — omit to skip
+   // rendering the search input entirely.
+   onSearchChange?: (value: string) => void;
+   searchPlaceholder?: string;
    // Extra toolbar content (e.g. a "Create User" button) rendered next to
    // the Columns dropdown — keeps DataTable generic instead of hardcoding
    // page-specific actions here.
@@ -50,42 +54,54 @@ interface DataTableProps<TData, TValue> {
 export function DataTable<TData, TValue>({
    columns,
    data,
-   filterColumn,
-   filterPlaceholder,
+   total,
+   pagination,
+   onPaginationChange,
+   onSearchChange,
+   searchPlaceholder,
    toolbarActions,
 }: DataTableProps<TData, TValue>) {
-   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-      []
-   );
    const [columnVisibility, setColumnVisibility] =
       React.useState<VisibilityState>({});
+   const [searchInput, setSearchInput] = React.useState('');
+
+   // Ref, not a direct effect dependency — onSearchChange is typically an
+   // inline arrow function that changes identity on every parent render
+   // (e.g. every pagination change), which would otherwise retrigger this
+   // debounce and reset the search on unrelated re-renders.
+   const onSearchChangeRef = React.useRef(onSearchChange);
+   React.useEffect(() => {
+      onSearchChangeRef.current = onSearchChange;
+   });
+
+   React.useEffect(() => {
+      if (!onSearchChangeRef.current) return;
+      const handle = setTimeout(
+         () => onSearchChangeRef.current?.(searchInput),
+         SEARCH_DEBOUNCE_MS
+      );
+      return () => clearTimeout(handle);
+   }, [searchInput]);
 
    const table = useReactTable({
       data,
       columns,
       getCoreRowModel: getCoreRowModel(),
-      getFilteredRowModel: getFilteredRowModel(),
-      getPaginationRowModel: getPaginationRowModel(),
-      onColumnFiltersChange: setColumnFilters,
+      manualPagination: true,
+      pageCount: Math.max(1, Math.ceil(total / pagination.pageSize)),
+      onPaginationChange,
       onColumnVisibilityChange: setColumnVisibility,
-      state: { columnFilters, columnVisibility },
+      state: { pagination, columnVisibility },
    });
 
    return (
       <div className="flex flex-col gap-4">
          <div className="flex items-center justify-between gap-2">
-            {filterColumn && (
+            {onSearchChange && (
                <Input
-                  placeholder={filterPlaceholder ?? `Filter ${filterColumn}...`}
-                  value={
-                     (table.getColumn(filterColumn)?.getFilterValue() as
-                        string | undefined) ?? ''
-                  }
-                  onChange={(e) =>
-                     table
-                        .getColumn(filterColumn)
-                        ?.setFilterValue(e.target.value)
-                  }
+                  placeholder={searchPlaceholder ?? 'Search...'}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="max-w-sm"
                />
             )}
@@ -168,11 +184,11 @@ export function DataTable<TData, TValue>({
 
          <div className="flex items-center justify-between gap-2">
             <span className="text-sm text-muted-foreground">
-               {table.getFilteredRowModel().rows.length} row(s) total
+               {total} row(s) total
             </span>
             <div className="flex items-center gap-2">
                <span className="text-sm text-muted-foreground">
-                  Page {table.getState().pagination.pageIndex + 1} of{' '}
+                  Page {pagination.pageIndex + 1} of{' '}
                   {Math.max(table.getPageCount(), 1)}
                </span>
                <Button

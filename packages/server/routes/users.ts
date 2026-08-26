@@ -10,24 +10,47 @@ import { requireAdmin } from '../middleware/require-admin';
 
 export const usersRouter = Router();
 
+const DEFAULT_PAGE_SIZE = 10;
+const MAX_PAGE_SIZE = 100;
+
 usersRouter.get(
    '/',
    requireAuth,
    requireAdmin,
    async (req: Request, res: Response) => {
-      const users = await prisma.user.findMany({
-         where: { deletedAt: null },
-         select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            createdAt: true,
-         },
-         orderBy: { name: 'asc' },
-      });
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const pageSize = Math.min(
+         MAX_PAGE_SIZE,
+         Math.max(1, Number(req.query.pageSize) || DEFAULT_PAGE_SIZE)
+      );
+      const search =
+         typeof req.query.search === 'string' ? req.query.search.trim() : '';
 
-      res.json({ users });
+      const where = {
+         deletedAt: null,
+         ...(search && {
+            email: { contains: search, mode: 'insensitive' as const },
+         }),
+      };
+
+      const [users, total] = await Promise.all([
+         prisma.user.findMany({
+            where,
+            select: {
+               id: true,
+               name: true,
+               email: true,
+               role: true,
+               createdAt: true,
+            },
+            orderBy: { name: 'asc' },
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+         }),
+         prisma.user.count({ where }),
+      ]);
+
+      res.json({ users, total, page, pageSize });
    }
 );
 
