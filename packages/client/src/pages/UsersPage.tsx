@@ -1,5 +1,10 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import type { ColumnDef, PaginationState } from '@tanstack/react-table';
+import type {
+   ColumnDef,
+   ColumnFiltersState,
+   OnChangeFn,
+   PaginationState,
+} from '@tanstack/react-table';
 import axios from 'axios';
 import { Role } from 'core';
 import moment from 'moment';
@@ -7,17 +12,11 @@ import { useState } from 'react';
 import { DataTable } from '../components/data-table';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
-import { Skeleton } from '../components/ui/skeleton';
-import {
-   Table,
-   TableBody,
-   TableCell,
-   TableHead,
-   TableHeader,
-   TableRow,
-} from '../components/ui/table';
+import { TableSkeleton } from '../components/ui/skeletons';
+import { TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { CreateUserDialog } from '../components/users/CreateUserDialog';
 import { UserRowActions } from '../components/users/UserRowActions';
+import { useDebouncedValue } from '../hooks/use-debounced-value';
 
 export type ApiUser = {
    id: string;
@@ -78,8 +77,7 @@ const columns: ColumnDef<ApiUser>[] = [
    {
       accessorKey: 'createdAt',
       header: 'Joined',
-      cell: ({ row }) =>
-         moment(row.getValue<string>('createdAt')).format('MMM D, YYYY'),
+      cell: ({ row }) => moment(row.getValue<string>('createdAt')).format('ll'),
    },
    {
       id: 'actions',
@@ -89,7 +87,6 @@ const columns: ColumnDef<ApiUser>[] = [
    },
 ];
 
-const SKELETON_ROW_COUNT = 5;
 const DEFAULT_PAGE_SIZE = 10;
 
 function UsersTableHeader() {
@@ -111,7 +108,18 @@ export function UsersPage() {
       pageIndex: 0,
       pageSize: DEFAULT_PAGE_SIZE,
    });
-   const [search, setSearch] = useState('');
+   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+   const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (
+      updater
+   ) => {
+      setColumnFilters(updater);
+      setPagination((prev) => ({ ...prev, pageIndex: 0 }));
+   };
+
+   const rawSearch = columnFilters.find((f) => f.id === 'email')?.value as
+      string | undefined;
+   const search = useDebouncedValue(rawSearch ?? '', 300);
 
    const { data, isPending, isError } = useQuery({
       queryKey: ['users', pagination.pageIndex, pagination.pageSize, search],
@@ -123,6 +131,9 @@ export function UsersPage() {
          }),
       placeholderData: keepPreviousData,
    });
+   const pageCount = data
+      ? Math.max(Math.ceil(data.total / pagination.pageSize), 1)
+      : 1;
 
    return (
       <div className="flex flex-col gap-4">
@@ -131,30 +142,16 @@ export function UsersPage() {
          </h1>
 
          {isPending && (
-            <Table>
-               <UsersTableHeader />
-               <TableBody>
-                  {Array.from({ length: SKELETON_ROW_COUNT }).map((_, i) => (
-                     <TableRow key={i}>
-                        <TableCell>
-                           <Skeleton className="h-4 w-24 bg-muted-foreground/20" />
-                        </TableCell>
-                        <TableCell>
-                           <Skeleton className="h-4 w-40 bg-muted-foreground/20" />
-                        </TableCell>
-                        <TableCell>
-                           <Skeleton className="h-4 w-14 bg-muted-foreground/20" />
-                        </TableCell>
-                        <TableCell>
-                           <Skeleton className="h-4 w-20 bg-muted-foreground/20" />
-                        </TableCell>
-                        <TableCell>
-                           <Skeleton className="h-8 w-8 rounded-md bg-muted-foreground/20" />
-                        </TableCell>
-                     </TableRow>
-                  ))}
-               </TableBody>
-            </Table>
+            <TableSkeleton
+               header={<UsersTableHeader />}
+               columns={[
+                  { width: 'w-24' },
+                  { width: 'w-40' },
+                  { width: 'w-14' },
+                  { width: 'w-20' },
+                  { width: 'w-8', height: 'h-8' },
+               ]}
+            />
          )}
 
          {isError && (
@@ -169,14 +166,13 @@ export function UsersPage() {
             <DataTable
                columns={columns}
                data={data.users}
-               total={data.total}
+               filterColumn="email"
+               filterPlaceholder="Search emails..."
+               columnFilters={columnFilters}
+               onColumnFiltersChange={handleColumnFiltersChange}
                pagination={pagination}
                onPaginationChange={setPagination}
-               onSearchChange={(value) => {
-                  setSearch(value);
-                  setPagination((p) => ({ ...p, pageIndex: 0 }));
-               }}
-               searchPlaceholder="Search emails..."
+               pageCount={pageCount}
                toolbarActions={<CreateUserDialog />}
             />
          )}

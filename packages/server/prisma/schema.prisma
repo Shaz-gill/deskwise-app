@@ -18,35 +18,34 @@ enum Role {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String
-  emailVerified Boolean   @default(false)
-  image         String?
-  role          Role      @default(user)
-  deletedAt     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
+  id              String        @id
+  name            String
+  email           String        @unique
+  emailVerified   Boolean
+  image           String?
+  role            Role          @default(user)
+  deletedAt       DateTime?
+  createdAt       DateTime
+  updatedAt       DateTime
+  sessions        Session[]
+  accounts        Account[]
+  assignedTickets Ticket[]
+  ticketReplies   TicketReply[]
 
-  @@unique([email])
   @@map("user")
 }
 
 model Session {
   id        String   @id
   expiresAt DateTime
-  token     String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
   ipAddress String?
   userAgent String?
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([token])
-  @@index([userId])
   @@map("session")
 }
 
@@ -63,21 +62,68 @@ model Account {
   refreshTokenExpiresAt DateTime?
   scope                 String?
   password              String?
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
+  createdAt             DateTime
+  updatedAt             DateTime
 
-  @@index([userId])
   @@map("account")
 }
 
 model Verification {
-  id         String   @id
+  id         String    @id
   identifier String
   value      String
   expiresAt  DateTime
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime?
+  updatedAt  DateTime?
 
-  @@index([identifier])
   @@map("verification")
+}
+
+enum TicketStatus {
+  open
+  resolved
+  closed
+}
+
+enum TicketCategory {
+  general_question
+  technical_question
+  refund_request
+}
+
+model Ticket {
+  id           Int             @id @default(autoincrement())
+  subject      String
+  body         String
+  bodyHtml     String?
+  status       TicketStatus    @default(open)
+  category     TicketCategory?
+  senderName   String
+  senderEmail  String
+  assignedToId String?
+  assignedTo   User?           @relation(fields: [assignedToId], references: [id])
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  replies      TicketReply[]
+
+  @@map("ticket")
+}
+
+enum TicketReplySenderType {
+  user
+  customer
+}
+
+model TicketReply {
+  id         Int                   @id @default(autoincrement())
+  body       String
+  bodyHtml   String?
+  ticketId   Int
+  ticket     Ticket                @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  authorId   String
+  author     User                  @relation(fields: [authorId], references: [id])
+  senderType TicketReplySenderType @default(user)
+  createdAt  DateTime              @default(now())
+
+  @@map("ticket_reply")
 }

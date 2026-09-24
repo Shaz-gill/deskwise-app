@@ -13,6 +13,9 @@ export const usersRouter = Router();
 const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
 
+// ------------------------------------------------------------------------
+// List users (paginated, searchable by email), excludes soft-deleted users
+
 usersRouter.get(
    '/',
    requireAuth,
@@ -53,6 +56,28 @@ usersRouter.get(
       res.json({ users, total, page, pageSize });
    }
 );
+
+// ------------------------------------------------------------------------
+// List users assignable to a ticket — unpaginated, open to any
+// authenticated user (not just admins), since ticket assignment itself
+// (routes/tickets.ts's PATCH /:id) isn't admin-gated either
+
+usersRouter.get(
+   '/assignable',
+   requireAuth,
+   async (_req: Request, res: Response) => {
+      const users = await prisma.user.findMany({
+         where: { deletedAt: null },
+         select: { id: true, name: true, email: true },
+         orderBy: { name: 'asc' },
+      });
+
+      res.json({ users });
+   }
+);
+
+// ------------------------------------------------------------------------
+// Create a user with a credential account (admin-provisioned, no sign-up)
 
 usersRouter.post(
    '/',
@@ -101,6 +126,9 @@ usersRouter.post(
    }
 );
 
+// ------------------------------------------------------------------------
+// Update a user's name/email, and optionally reset their password
+
 usersRouter.patch(
    '/:id',
    requireAuth,
@@ -144,6 +172,9 @@ usersRouter.patch(
    }
 );
 
+// ------------------------------------------------------------------------
+// Soft-delete a user (admin accounts are protected)
+
 usersRouter.delete(
    '/:id',
    requireAuth,
@@ -175,10 +206,6 @@ usersRouter.delete(
             where: { id: userId },
             data: {
                deletedAt: new Date(),
-               // Frees the original email for reuse by a new account —
-               // the user row (id/name/role) sticks around for ticket
-               // history, but its email no longer occupies the unique
-               // constraint.
                email: `deleted+${userId}@deskwise.invalid`,
             },
          }),

@@ -3,9 +3,6 @@ import { hashPassword } from 'better-auth/crypto';
 import { Role } from '../../generated/prisma/enums';
 import prisma from '../../db';
 
-// Seeds the initial admin user directly through Prisma, bypassing Better
-// Auth's sign-up endpoint (which is intentionally disabled — see auth.ts).
-// Credentials come from the environment so they never live in source control.
 async function main() {
    const email = process.env.ADMIN_EMAIL;
    const password = process.env.ADMIN_PASSWORD;

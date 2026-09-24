@@ -9,6 +9,8 @@ import { authLimiter } from './middleware/auth-limiter';
 import { errorHandler } from './middleware/error-handler';
 import { isTrustedOrigin } from './lib/trusted-origins';
 import { usersRouter } from './routes/users';
+import { ticketsRouter } from './routes/tickets';
+import { ticketRepliesRouter } from './routes/ticket-replies';
 
 dotenv.config();
 
@@ -31,7 +33,9 @@ app.use(
    })
 );
 
-// Better Auth handler must be mounted BEFORE express.json(),
+// Better Auth handler must be mounted BEFORE express.json() — it reads the
+// raw request body itself, so express.json() would otherwise consume the
+// stream first and leave nothing for it to parse.
 app.all(
    '/api/auth/{*any}',
    authLimiter,
@@ -43,6 +47,8 @@ app.all(
 app.use(express.json());
 
 app.use('/api/users', usersRouter);
+app.use('/api/tickets', ticketsRouter);
+app.use('/api/tickets/:ticketId/replies', ticketRepliesRouter);
 
 app.use(errorHandler);
 
