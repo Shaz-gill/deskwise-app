@@ -267,6 +267,7 @@ ticketsRouter.post(
             ticketSubject: ticket.subject,
             ticketBody: ticket.body,
             customerName: ticket.senderName,
+            agentName: req.user.name,
          });
 
          res.json({ polishedBody });
