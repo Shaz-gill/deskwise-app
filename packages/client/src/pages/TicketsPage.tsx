@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import type {
    ColumnDef,
@@ -8,14 +7,15 @@ import type {
    SortingState,
 } from '@tanstack/react-table';
 import axios from 'axios';
-import moment from 'moment';
-import { Link } from 'react-router-dom';
 import { TicketCategory, TicketStatus } from 'core';
+import moment from 'moment';
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { DataTable } from '../components/data-table';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { Badge } from '../components/ui/badge';
 import { TableSkeleton } from '../components/ui/skeletons';
 import { TableHead, TableHeader, TableRow } from '../components/ui/table';
-import { DataTable } from '../components/data-table';
 import { useDebouncedValue } from '../hooks/use-debounced-value';
 import { formatCategory, STATUS_BADGE_VARIANT } from '../lib/ticket-format';
 

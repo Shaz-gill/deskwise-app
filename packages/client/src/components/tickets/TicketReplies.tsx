@@ -1,10 +1,10 @@
-import moment from 'moment';
+import { cn } from '@/lib/utils';
 import { TicketReplySenderType } from 'core';
+import moment from 'moment';
+import { getReplySenderInfo } from '../../lib/ticket-format';
 import type { ApiTicketReply } from '../../pages/TicketDetailPage';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { cn } from '@/lib/utils';
-import { getReplySenderInfo } from '../../lib/ticket-format';
 import { TicketReplyForm } from './TicketReplyForm';
 
 export function TicketReplies({

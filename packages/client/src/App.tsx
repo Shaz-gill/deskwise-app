@@ -1,15 +1,15 @@
-import { Routes, Route } from 'react-router-dom';
-import { ProtectedRoute } from './components/routes/ProtectedRoute';
-import { GuestRoute } from './components/routes/GuestRoute';
-import { AdminRoute } from './components/routes/AdminRoute';
+import { Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
-import { LoginPage } from './pages/LoginPage';
-import { HomePage } from './pages/HomePage';
+import { AdminRoute } from './components/routes/AdminRoute';
+import { GuestRoute } from './components/routes/GuestRoute';
+import { ProtectedRoute } from './components/routes/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
-import { UsersPage } from './pages/UsersPage';
-import { TicketsPage } from './pages/TicketsPage';
-import { TicketDetailPage } from './pages/TicketDetailPage';
+import { HomePage } from './pages/HomePage';
+import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { TicketDetailPage } from './pages/TicketDetailPage';
+import { TicketsPage } from './pages/TicketsPage';
+import { UsersPage } from './pages/UsersPage';
 
 function App() {
    return (

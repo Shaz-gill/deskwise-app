@@ -1,6 +1,7 @@
 import { useQuery, type UseMutationResult } from '@tanstack/react-query';
 import axios from 'axios';
 import { TicketCategory, TicketStatus } from 'core';
+import { formatCategory } from '../../lib/ticket-format';
 import type { ApiTicketDetail } from '../../pages/TicketDetailPage';
 import { Alert, AlertDescription } from '../ui/alert';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -12,7 +13,6 @@ import {
    SelectTrigger,
    SelectValue,
 } from '../ui/select';
-import { formatCategory } from '../../lib/ticket-format';
 import type { TicketUpdatePayload } from './TicketDetail';
 
 const UNASSIGNED_VALUE = '__unassigned__';

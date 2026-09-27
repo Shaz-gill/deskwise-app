@@ -1,8 +1,8 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import type { TicketCategory, TicketStatus } from 'core';
 import { CalendarPlus, RefreshCw } from 'lucide-react';
 import moment from 'moment';
-import type { TicketCategory, TicketStatus } from 'core';
 import type { ApiTicketDetail } from '../../pages/TicketDetailPage';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';

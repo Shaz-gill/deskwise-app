@@ -1,12 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
+import type { Role, TicketReplySenderType } from 'core';
 import { ArrowLeft } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
-import type { Role, TicketReplySenderType } from 'core';
+import { TicketDetail } from '../components/tickets/TicketDetail';
 import { Alert, AlertDescription } from '../components/ui/alert';
 import { buttonVariants } from '../components/ui/button';
 import { TicketDetailSkeleton } from '../components/ui/skeletons';
-import { TicketDetail } from '../components/tickets/TicketDetail';
 import { cn } from '../lib/utils';
 import type { ApiTicket } from './TicketsPage';
 

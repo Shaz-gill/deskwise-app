@@ -1,4 +1,3 @@
-import * as React from 'react';
 import {
    type ColumnDef,
    type ColumnFiltersState,
@@ -13,9 +12,9 @@ import {
    useReactTable,
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import * as React from 'react';
 
 import { Button } from './ui/button';
-import { Input } from './ui/input';
 import {
    DropdownMenu,
    DropdownMenuCheckboxItem,
@@ -24,6 +23,7 @@ import {
    DropdownMenuRadioItem,
    DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Input } from './ui/input';
 import {
    Table,
    TableBody,

@@ -8,9 +8,9 @@ import {
    SettingsIcon,
    SunIcon,
    TicketIcon,
-   type LucideIcon,
    UserIcon,
    UsersIcon,
+   type LucideIcon,
 } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../hooks/use-dark-mode';

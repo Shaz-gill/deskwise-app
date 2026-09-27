@@ -1,13 +1,13 @@
-import { useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import { Sparkles } from 'lucide-react';
-import { useForm } from 'react-hook-form';
 import {
    createTicketReplySchema,
    type CreateTicketReplyFormValues,
 } from 'core';
+import { Sparkles } from 'lucide-react';
+import { useRef } from 'react';
+import { useForm } from 'react-hook-form';
 import type {
    ApiTicketDetail,
    ApiTicketReply,
