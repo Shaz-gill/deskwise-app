@@ -2,6 +2,7 @@ import { useRef } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { Sparkles } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import {
    createTicketReplySchema,
@@ -32,14 +33,28 @@ async function createTicketReply(
    return data.reply;
 }
 
+type PolishReplyResponse = { polishedBody: string };
+
+async function polishReply(ticketId: string, body: string): Promise<string> {
+   const { data } = await axios.post<PolishReplyResponse>(
+      `/api/tickets/${ticketId}/replies/polish`,
+      { body },
+      { withCredentials: true }
+   );
+
+   return data.polishedBody;
+}
+
 export function TicketReplyForm({ ticketId }: { ticketId: string }) {
    const queryClient = useQueryClient();
    const editorRef = useRef<RichTextEditorHandle>(null);
 
    const {
-      setValue,
       handleSubmit,
       reset,
+      setValue,
+      getValues,
+      watch,
       formState: { errors },
    } = useForm<CreateTicketReplyFormValues>({
       resolver: zodResolver(createTicketReplySchema),
@@ -65,6 +80,15 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
       },
    });
 
+   const polishMutation = useMutation({
+      mutationFn: () => polishReply(ticketId, getValues('body')),
+      onSuccess: (polishedBody) => {
+         editorRef.current?.setContent(polishedBody);
+      },
+   });
+
+   const bodyValue = watch('body');
+
    function onSubmit(values: CreateTicketReplyFormValues) {
       mutation.mutate(values);
    }
@@ -89,6 +113,14 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
             <FieldError errors={[errors.body]} />
          </Field>
 
+         {polishMutation.isError && (
+            <Alert variant="destructive">
+               <AlertDescription>
+                  Failed to polish reply. Please try again.
+               </AlertDescription>
+            </Alert>
+         )}
+
          {mutation.isError && (
             <Alert variant="destructive">
                <AlertDescription>
@@ -97,13 +129,28 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
             </Alert>
          )}
 
-         <Button
-            type="submit"
-            disabled={mutation.isPending}
-            className="self-end"
-         >
-            {mutation.isPending ? 'Sending…' : 'Send reply'}
-         </Button>
+         <div className="flex gap-2 self-end">
+            <Button
+               type="button"
+               variant="outline"
+               disabled={
+                  polishMutation.isPending ||
+                  mutation.isPending ||
+                  !bodyValue?.trim()
+               }
+               onClick={() => polishMutation.mutate()}
+            >
+               <Sparkles />
+               {polishMutation.isPending ? 'Polishing…' : 'Polish'}
+            </Button>
+            <Button
+               type="submit"
+               disabled={mutation.isPending || polishMutation.isPending}
+               className="self-end"
+            >
+               {mutation.isPending ? 'Sending…' : 'Send reply'}
+            </Button>
+         </div>
       </form>
    );
 }

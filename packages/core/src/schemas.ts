@@ -73,3 +73,14 @@ export const createTicketReplySchema = z.object({
 export type CreateTicketReplyFormValues = z.infer<
    typeof createTicketReplySchema
 >;
+
+// ------------------------------------------------------------------------
+
+export const polishReplySchema = z.object({
+   body: z
+      .string()
+      .trim()
+      .min(1, 'Reply cannot be empty')
+      .max(10_000, 'Reply is too long'),
+});
+export type PolishReplyPayload = z.infer<typeof polishReplySchema>;

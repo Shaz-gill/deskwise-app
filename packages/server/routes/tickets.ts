@@ -7,7 +7,7 @@ import { TicketCategory, TicketStatus } from '../generated/prisma/enums';
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { validateBody } from '../lib/validate';
 import { requireAuth } from '../middleware/require-auth';
-import { inboundEmailLimiter } from '../middleware/inbound-email-limiter';
+import { inboundEmailLimiter } from '../middleware/rate-limiters';
 import { verifyWebhookSecret } from '../middleware/verify-webhook-secret';
 import { TICKET_REPLY_SELECT } from './ticket-replies';
 

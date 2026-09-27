@@ -60,19 +60,13 @@ export function TicketDetail({ ticket }: { ticket: ApiTicketDetail }) {
                         {ticket.senderEmail}
                      </span>
                   </div>
-                  <div className="flex flex-col items-end gap-1 text-xs text-muted-foreground">
-                     <span
-                        className="flex items-center gap-1.5"
-                        title="Created"
-                     >
-                        <CalendarPlus className="size-3.5" />
+                  <div className="grid grid-cols-[auto_1fr] items-center gap-x-1.5 gap-y-1 text-xs text-muted-foreground">
+                     <CalendarPlus className="size-3.5" />
+                     <span title="Created">
                         {moment(ticket.createdAt).format('lll')}
                      </span>
-                     <span
-                        className="flex items-center gap-1.5"
-                        title="Last updated"
-                     >
-                        <RefreshCw className="size-3.5" />
+                     <RefreshCw className="size-3.5" />
+                     <span title="Last updated">
                         {moment(ticket.updatedAt).format('lll')}
                      </span>
                   </div>

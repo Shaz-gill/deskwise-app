@@ -4,7 +4,9 @@ import {
    LogOutIcon,
    MoonIcon,
    SunIcon,
+   TicketIcon,
    UserIcon,
+   UsersIcon,
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../hooks/use-dark-mode';
@@ -46,16 +48,18 @@ export function NavBar() {
                {data?.user?.role === Role.admin && (
                   <Link
                      to="/users"
-                     className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                     className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
                   >
+                     <UsersIcon className="size-4" />
                      Users
                   </Link>
                )}
                {data?.user && (
                   <Link
                      to="/tickets"
-                     className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                     className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
                   >
+                     <TicketIcon className="size-4" />
                      Tickets
                   </Link>
                )}

@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 
 export interface RichTextEditorHandle {
    clear: () => void;
+   setContent: (text: string) => void;
 }
 
 const TOOLBAR_OPTIONS = [
@@ -54,6 +55,10 @@ export const RichTextEditor = React.forwardRef<
       // right after it just reset its form state (e.g. after a successful
       // submit), resurrecting a "required" error the user never caused.
       clear: () => quillRef.current?.setText('', 'silent'),
+      // Not 'silent' — callers (e.g. polish-reply) rely on this also
+      // running the normal text-change handler so onChange fires and the
+      // caller's form state picks up the new html/text.
+      setContent: (text: string) => quillRef.current?.setText(text),
    }));
 
    React.useEffect(() => {

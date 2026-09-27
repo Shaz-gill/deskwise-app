@@ -5,7 +5,7 @@ import dotenv from 'dotenv';
 import helmet from 'helmet';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth';
-import { authLimiter } from './middleware/auth-limiter';
+import { authLimiter } from './middleware/rate-limiters';
 import { errorHandler } from './middleware/error-handler';
 import { isTrustedOrigin } from './lib/trusted-origins';
 import { usersRouter } from './routes/users';
