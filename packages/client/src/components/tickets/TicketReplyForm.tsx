@@ -61,7 +61,7 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
       defaultValues: { body: '' },
    });
 
-   const mutation = useMutation({
+   const replyMutation = useMutation({
       mutationFn: (values: CreateTicketReplyFormValues) =>
          createTicketReply(ticketId, values),
       onSuccess: (reply) => {
@@ -90,7 +90,7 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
    const bodyValue = watch('body');
 
    function onSubmit(values: CreateTicketReplyFormValues) {
-      mutation.mutate(values);
+      replyMutation.mutate(values);
    }
 
    return (
@@ -121,7 +121,7 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
             </Alert>
          )}
 
-         {mutation.isError && (
+         {replyMutation.isError && (
             <Alert variant="destructive">
                <AlertDescription>
                   Failed to send reply. Please try again.
@@ -135,7 +135,7 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
                variant="outline"
                disabled={
                   polishMutation.isPending ||
-                  mutation.isPending ||
+                  replyMutation.isPending ||
                   !bodyValue?.trim()
                }
                onClick={() => polishMutation.mutate()}
@@ -145,10 +145,10 @@ export function TicketReplyForm({ ticketId }: { ticketId: string }) {
             </Button>
             <Button
                type="submit"
-               disabled={mutation.isPending || polishMutation.isPending}
+               disabled={replyMutation.isPending || polishMutation.isPending}
                className="self-end"
             >
-               {mutation.isPending ? 'Sending…' : 'Send reply'}
+               {replyMutation.isPending ? 'Sending…' : 'Send reply'}
             </Button>
          </div>
       </form>

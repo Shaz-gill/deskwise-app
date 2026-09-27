@@ -10,7 +10,6 @@ import { errorHandler } from './middleware/error-handler';
 import { isTrustedOrigin } from './lib/trusted-origins';
 import { usersRouter } from './routes/users';
 import { ticketsRouter } from './routes/tickets';
-import { ticketRepliesRouter } from './routes/ticket-replies';
 
 dotenv.config();
 
@@ -48,7 +47,6 @@ app.use(express.json());
 
 app.use('/api/users', usersRouter);
 app.use('/api/tickets', ticketsRouter);
-app.use('/api/tickets/:ticketId/replies', ticketRepliesRouter);
 
 app.use(errorHandler);
 

@@ -1,15 +1,23 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
-import { inboundEmailSchema, updateTicketSchema } from 'core';
+import {
+   createTicketReplySchema,
+   inboundEmailSchema,
+   polishReplySchema,
+   updateTicketSchema,
+} from 'core';
 import prisma from '../db';
 import { Prisma } from '../generated/prisma/client';
 import { TicketCategory, TicketStatus } from '../generated/prisma/enums';
+import { polishReply } from '../lib/polish-reply';
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { validateBody } from '../lib/validate';
 import { requireAuth } from '../middleware/require-auth';
-import { inboundEmailLimiter } from '../middleware/rate-limiters';
+import {
+   inboundEmailLimiter,
+   polishLimiter,
+} from '../middleware/rate-limiters';
 import { verifyWebhookSecret } from '../middleware/verify-webhook-secret';
-import { TICKET_REPLY_SELECT } from './ticket-replies';
 
 export const ticketsRouter = Router();
 
@@ -25,6 +33,15 @@ const TICKET_SELECT = {
    createdAt: true,
    updatedAt: true,
    assignedTo: { select: { id: true, name: true, email: true } },
+} as const;
+
+const TICKET_REPLY_SELECT = {
+   id: true,
+   body: true,
+   bodyHtml: true,
+   senderType: true,
+   createdAt: true,
+   author: { select: { id: true, name: true, email: true, role: true } },
 } as const;
 
 const SORTABLE_FIELDS = ['subject', 'status', 'category', 'createdAt'] as const;
@@ -179,6 +196,84 @@ ticketsRouter.patch(
       });
 
       res.json({ ticket });
+   }
+);
+
+// ------------------------------------------------------------------------
+// Add a reply to a ticket
+
+ticketsRouter.post(
+   '/:id/replies',
+   requireAuth,
+   async (req: Request, res: Response) => {
+      const data = validateBody(createTicketReplySchema, req, res);
+      if (!data) return;
+
+      const idParam = req.params.id;
+      const ticketId =
+         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
+      if (!Number.isInteger(ticketId)) {
+         res.status(400).json({ error: 'Invalid ticket id' });
+         return;
+      }
+
+      const reply = await prisma.ticketReply.create({
+         data: {
+            body: data.body,
+            bodyHtml: data.bodyHtml
+               ? sanitizeHtml(data.bodyHtml)
+               : data.bodyHtml,
+            ticketId,
+            authorId: req.user.id,
+         },
+         select: TICKET_REPLY_SELECT,
+      });
+
+      res.status(201).json({ reply });
+   }
+);
+
+// ------------------------------------------------------------------------
+// Polish a draft reply with AI before sending
+
+ticketsRouter.post(
+   '/:id/replies/polish',
+   requireAuth,
+   polishLimiter,
+   async (req: Request, res: Response) => {
+      const data = validateBody(polishReplySchema, req, res);
+      if (!data) return;
+
+      const idParam = req.params.id;
+      const ticketId =
+         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
+      if (!Number.isInteger(ticketId)) {
+         res.status(400).json({ error: 'Invalid ticket id' });
+         return;
+      }
+
+      try {
+         const ticket = await prisma.ticket.findUnique({
+            where: { id: ticketId },
+            select: { subject: true, body: true, senderName: true },
+         });
+         if (!ticket) {
+            res.status(404).json({ error: 'Ticket not found' });
+            return;
+         }
+
+         const polishedBody = await polishReply({
+            draft: data.body,
+            ticketSubject: ticket.subject,
+            ticketBody: ticket.body,
+            customerName: ticket.senderName,
+         });
+
+         res.json({ polishedBody });
+      } catch (err) {
+         console.error('Failed to polish reply:', err);
+         res.status(500).json({ error: 'Failed to polish reply' });
+      }
    }
 );
 
