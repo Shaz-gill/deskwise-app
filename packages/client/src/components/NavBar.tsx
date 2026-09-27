@@ -1,14 +1,18 @@
 import { Role } from 'core';
 import {
    ChevronDownIcon,
+   LayoutDashboardIcon,
    LogOutIcon,
+   MenuIcon,
    MoonIcon,
+   SettingsIcon,
    SunIcon,
    TicketIcon,
+   type LucideIcon,
    UserIcon,
    UsersIcon,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../hooks/use-dark-mode';
 import { authClient } from '../lib/auth-client';
 import { PAGE_CONTAINER } from '../lib/layout';
@@ -22,8 +26,15 @@ import {
    DropdownMenuTrigger,
 } from './ui/dropdown-menu';
 
+function isNavLinkActive(pathname: string, path: string) {
+   return pathname === path || pathname.startsWith(`${path}/`);
+}
+
+type NavItem = { to: string; icon: LucideIcon; label: string };
+
 export function NavBar() {
    const navigate = useNavigate();
+   const { pathname } = useLocation();
    const { data, refetch } = authClient.useSession();
    const { isDark, toggle } = useDarkMode();
 
@@ -33,36 +44,48 @@ export function NavBar() {
       navigate('/login', { replace: true });
    }
 
+   const navItems: NavItem[] = [
+      data?.user && {
+         to: '/dashboard',
+         icon: LayoutDashboardIcon,
+         label: 'Dashboard',
+      },
+      data?.user?.role === Role.admin && {
+         to: '/users',
+         icon: UsersIcon,
+         label: 'Users',
+      },
+      data?.user && { to: '/tickets', icon: TicketIcon, label: 'Tickets' },
+   ].filter((item): item is NavItem => !!item);
+
    return (
       <nav className="border-b border-border bg-card">
          <div
             className={cn(
                PAGE_CONTAINER,
-               'flex items-center justify-between py-4'
+               'flex items-center justify-between gap-2 py-4'
             )}
          >
             <div className="flex items-center gap-6">
                <Link to="/">
                   <Logo size="sm" />
                </Link>
-               {data?.user?.role === Role.admin && (
-                  <Link
-                     to="/users"
-                     className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                     <UsersIcon className="size-4" />
-                     Users
-                  </Link>
-               )}
-               {data?.user && (
-                  <Link
-                     to="/tickets"
-                     className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
-                  >
-                     <TicketIcon className="size-4" />
-                     Tickets
-                  </Link>
-               )}
+               <div className="hidden items-center gap-6 md:flex">
+                  {navItems.map((item) => (
+                     <Link
+                        key={item.to}
+                        to={item.to}
+                        className={cn(
+                           'flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground',
+                           isNavLinkActive(pathname, item.to) &&
+                              'font-semibold text-foreground'
+                        )}
+                     >
+                        <item.icon className="size-4" />
+                        {item.label}
+                     </Link>
+                  ))}
+               </div>
             </div>
             <div className="flex items-center gap-2">
                <Button
@@ -75,17 +98,56 @@ export function NavBar() {
                >
                   {isDark ? <MoonIcon /> : <SunIcon />}
                </Button>
+               {navItems.length > 0 && (
+                  <DropdownMenu>
+                     <DropdownMenuTrigger
+                        render={
+                           <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              aria-label="Open navigation menu"
+                              className="md:hidden"
+                           >
+                              <MenuIcon />
+                           </Button>
+                        }
+                     />
+                     <DropdownMenuContent align="end">
+                        {navItems.map((item) => (
+                           <DropdownMenuItem
+                              key={item.to}
+                              onClick={() => navigate(item.to)}
+                              className={cn(
+                                 isNavLinkActive(pathname, item.to) &&
+                                    'font-semibold text-foreground'
+                              )}
+                           >
+                              <item.icon />
+                              {item.label}
+                           </DropdownMenuItem>
+                        ))}
+                     </DropdownMenuContent>
+                  </DropdownMenu>
+               )}
                <DropdownMenu>
                   <DropdownMenuTrigger
                      render={
                         <Button variant="ghost" className="gap-1.5">
                            <UserIcon className="text-muted-foreground" />
-                           {data?.user?.name}
+                           <span className="hidden sm:inline">
+                              {data?.user?.name}
+                           </span>
                            <ChevronDownIcon className="text-muted-foreground" />
                         </Button>
                      }
                   />
                   <DropdownMenuContent align="end">
+                     {data?.user?.role === Role.admin && (
+                        <DropdownMenuItem onClick={() => navigate('/settings')}>
+                           <SettingsIcon />
+                           Settings
+                        </DropdownMenuItem>
+                     )}
                      <DropdownMenuItem onClick={handleSignOut}>
                         <LogOutIcon />
                         Sign out
