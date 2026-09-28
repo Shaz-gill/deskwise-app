@@ -10,6 +10,8 @@ import { errorHandler } from './middleware/error-handler';
 import { isTrustedOrigin } from './lib/trusted-origins';
 import { usersRouter } from './routes/users';
 import { ticketsRouter } from './routes/tickets';
+import { startQueue } from './lib/queue';
+import { registerClassifyTicketWorker } from './jobs/classify-ticket-job';
 
 dotenv.config();
 
@@ -49,6 +51,12 @@ app.use(express.json());
 
 app.use('/api/users', usersRouter);
 app.use('/api/tickets', ticketsRouter);
+
+// pg-boss needs boss.start() before any send()/work() call, and the
+// classify-ticket worker needs to be registered once — both run here,
+// in order, before the server starts accepting traffic.
+await startQueue();
+await registerClassifyTicketWorker();
 
 app.use(errorHandler);
 

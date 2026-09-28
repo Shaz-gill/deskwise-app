@@ -9,10 +9,12 @@ import {
 import prisma from '../db';
 import { Prisma } from '../generated/prisma/client';
 import { TicketCategory, TicketStatus } from '../generated/prisma/enums';
+import { boss } from '../lib/queue';
 import { polishReply } from '../lib/polish-reply';
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { summarizeTicket } from '../lib/summarize-ticket';
 import { validateBody } from '../lib/validate';
+import { CLASSIFY_TICKET_QUEUE } from '../jobs/classify-ticket-job';
 import { requireAuth } from '../middleware/require-auth';
 import {
    inboundEmailLimiter,
@@ -383,6 +385,18 @@ ticketsRouter.post(
          },
          select: TICKET_SELECT,
       });
+
+      // Fire-and-forget: classification itself runs asynchronously in
+      // jobs/classify-ticket-job.ts's worker, not inline here, so this
+      // webhook response doesn't wait on an LLM call. A failure to enqueue
+      // is logged rather than failing the whole webhook — the ticket was
+      // already created, and simply staying uncategorized (category: null)
+      // is the existing fallback the rest of the app already handles.
+      try {
+         await boss.send(CLASSIFY_TICKET_QUEUE, { ticketId: ticket.id });
+      } catch (err) {
+         console.error('Failed to enqueue ticket classification:', err);
+      }
 
       res.status(201).json({ ticket });
    }
