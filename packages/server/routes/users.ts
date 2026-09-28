@@ -10,7 +10,7 @@ import { requireAdmin } from '../middleware/require-admin';
 
 export const usersRouter = Router();
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 100;
 
 // ------------------------------------------------------------------------

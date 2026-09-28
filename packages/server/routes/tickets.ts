@@ -65,7 +65,7 @@ function isTicketCategory(value: unknown): value is TicketCategory {
 
 const UNCATEGORIZED_FILTER_VALUE = 'uncategorized';
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 100;
 
 // ------------------------------------------------------------------------

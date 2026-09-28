@@ -114,7 +114,7 @@ export function DataTable<TData, TValue>({
    const [internalColumnFilters, setInternalColumnFilters] =
       React.useState<ColumnFiltersState>([]);
    const [internalPagination, setInternalPagination] =
-      React.useState<PaginationState>({ pageIndex: 0, pageSize: 10 });
+      React.useState<PaginationState>({ pageIndex: 0, pageSize: 15 });
    const [columnVisibility, setColumnVisibility] =
       React.useState<VisibilityState>({});
 

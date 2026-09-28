@@ -87,7 +87,7 @@ const columns: ColumnDef<ApiUser>[] = [
    },
 ];
 
-const DEFAULT_PAGE_SIZE = 10;
+const DEFAULT_PAGE_SIZE = 15;
 
 function UsersTableHeader() {
    return (

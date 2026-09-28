@@ -147,7 +147,7 @@ export function TicketsPage() {
    const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
    const [pagination, setPagination] = useState<PaginationState>({
       pageIndex: 0,
-      pageSize: 10,
+      pageSize: 15,
    });
 
    const handleColumnFiltersChange: OnChangeFn<ColumnFiltersState> = (
