@@ -13,7 +13,7 @@ import { boss } from '../lib/queue';
 import { polishReply } from '../lib/tickets/polish-reply';
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { summarizeTicket } from '../lib/tickets/summarize-ticket';
-import { validateBody } from '../lib/validate';
+import { parseIntParam, validateBody } from '../lib/validate';
 import { CLASSIFY_TICKET_QUEUE } from '../jobs/classify-ticket-job';
 import { requireAuth } from '../middleware/require-auth';
 import {
@@ -137,13 +137,8 @@ ticketsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
 // Fetch a single ticket with its replies
 
 ticketsRouter.get('/:id', requireAuth, async (req: Request, res: Response) => {
-   const idParam = req.params.id;
-   const id = typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-
-   if (!Number.isInteger(id)) {
-      res.status(400).json({ error: 'Invalid ticket id' });
-      return;
-   }
+   const id = parseIntParam(req.params.id, res, 'Invalid ticket id');
+   if (id === undefined) return;
 
    const ticket = await prisma.ticket.findUnique({
       where: { id },
@@ -175,13 +170,8 @@ ticketsRouter.patch(
       const data = validateBody(updateTicketSchema, req, res);
       if (!data) return;
 
-      const idParam = req.params.id;
-      const id =
-         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-      if (!Number.isInteger(id)) {
-         res.status(400).json({ error: 'Invalid ticket id' });
-         return;
-      }
+      const id = parseIntParam(req.params.id, res, 'Invalid ticket id');
+      if (id === undefined) return;
 
       const { assignedToId, status, category } = data;
 
@@ -217,13 +207,8 @@ ticketsRouter.post(
       const data = validateBody(createTicketReplySchema, req, res);
       if (!data) return;
 
-      const idParam = req.params.id;
-      const ticketId =
-         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-      if (!Number.isInteger(ticketId)) {
-         res.status(400).json({ error: 'Invalid ticket id' });
-         return;
-      }
+      const ticketId = parseIntParam(req.params.id, res, 'Invalid ticket id');
+      if (ticketId === undefined) return;
 
       const reply = await prisma.ticketReply.create({
          data: {
@@ -253,13 +238,8 @@ ticketsRouter.post(
       const data = validateBody(polishReplySchema, req, res);
       if (!data) return;
 
-      const idParam = req.params.id;
-      const ticketId =
-         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-      if (!Number.isInteger(ticketId)) {
-         res.status(400).json({ error: 'Invalid ticket id' });
-         return;
-      }
+      const ticketId = parseIntParam(req.params.id, res, 'Invalid ticket id');
+      if (ticketId === undefined) return;
 
       try {
          const ticket = await prisma.ticket.findUnique({
@@ -296,14 +276,8 @@ ticketsRouter.post(
    requireAuth,
    summarizeLimiter,
    async (req: Request, res: Response) => {
-      // Same numeric-id narrowing as GET/PATCH /:id.
-      const idParam = req.params.id;
-      const id =
-         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-      if (!Number.isInteger(id)) {
-         res.status(400).json({ error: 'Invalid ticket id' });
-         return;
-      }
+      const id = parseIntParam(req.params.id, res, 'Invalid ticket id');
+      if (id === undefined) return;
 
       try {
          // Minimal select (not the full TICKET_SELECT) — only

@@ -21,3 +21,22 @@ export function validateBody<T>(
 
    return result.data;
 }
+
+// Shared numeric-route-param parsing pattern used by every route with an
+// `:id` param (tickets.ts's GET/PATCH /:id, POST /:id/replies(/polish),
+// POST /:id/summarize, and knowledge-docs.ts's GET /:id/file, DELETE /:id).
+// Same shape as validateBody: sends the 400 itself and returns undefined on
+// failure, so callers just do `if (id === undefined) return;`.
+export function parseIntParam(
+   value: unknown,
+   res: Response,
+   errorMessage: string
+): number | undefined {
+   const id = typeof value === 'string' ? Number.parseInt(value, 10) : NaN;
+   if (!Number.isInteger(id)) {
+      res.status(400).json({ error: errorMessage });
+      return undefined;
+   }
+
+   return id;
+}

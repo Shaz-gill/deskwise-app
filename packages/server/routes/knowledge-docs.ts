@@ -9,6 +9,7 @@ import { INGEST_DOCUMENT_QUEUE } from '../jobs/ingest-document-job';
 import { KNOWLEDGE_BASE_DIR } from '../lib/knowledge-base/path';
 import { deleteDocVectors } from '../lib/knowledge-base/pinecone';
 import { boss } from '../lib/queue';
+import { parseIntParam } from '../lib/validate';
 import { knowledgeUploadLimiter } from '../middleware/rate-limiters';
 import { requireAdmin } from '../middleware/require-admin';
 import { requireAuth } from '../middleware/require-auth';
@@ -131,13 +132,8 @@ knowledgeDocsRouter.get(
    requireAuth,
    requireAdmin,
    async (req: Request, res: Response) => {
-      const idParam = req.params.id;
-      const id =
-         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-      if (!Number.isInteger(id)) {
-         res.status(400).json({ error: 'Invalid document id' });
-         return;
-      }
+      const id = parseIntParam(req.params.id, res, 'Invalid document id');
+      if (id === undefined) return;
 
       const doc = await prisma.knowledgeDoc.findUnique({ where: { id } });
       if (!doc) {
@@ -171,13 +167,8 @@ knowledgeDocsRouter.delete(
    requireAuth,
    requireAdmin,
    async (req: Request, res: Response) => {
-      const idParam = req.params.id;
-      const id =
-         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
-      if (!Number.isInteger(id)) {
-         res.status(400).json({ error: 'Invalid document id' });
-         return;
-      }
+      const id = parseIntParam(req.params.id, res, 'Invalid document id');
+      if (id === undefined) return;
 
       const doc = await prisma.knowledgeDoc.findUnique({ where: { id } });
       if (!doc) {
