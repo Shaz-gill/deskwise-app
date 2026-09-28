@@ -110,7 +110,7 @@ flowchart TB
 
     subgraph Async["Async job pipeline (pg-boss)"]
         ClassifyJob[classify-ticket job]
-        AutoResolveJob[auto-resolve-ticket job<br/>new → processing → resolved|open]
+        AutoResolveJob["auto-resolve-ticket job<br/>new → processing → resolved / open"]
         IngestJob[ingest-document job]
     end
 
