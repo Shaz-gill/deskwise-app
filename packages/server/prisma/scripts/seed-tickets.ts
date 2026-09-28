@@ -1,6 +1,10 @@
 import 'dotenv/config';
 import { Prisma } from '../../generated/prisma/client';
-import { TicketCategory, TicketStatus } from '../../generated/prisma/enums';
+import {
+   Role,
+   TicketCategory,
+   TicketStatus,
+} from '../../generated/prisma/enums';
 import prisma from '../../db';
 
 // Dev-only bulk seed for local testing of the tickets table's sorting
@@ -8,7 +12,8 @@ import prisma from '../../db';
 // (TicketsPage.tsx's DataTable filterColumn="subject"). Unlike seed.ts's
 // admin-user seed (which must be idempotent — it's part of real bootstrap),
 // this is a manual dev tool: every run inserts TICKET_COUNT more rows, on
-// purpose, so re-running to pad out more data is fine.
+// purpose, so re-running to pad out more data is fine. Content is themed
+// as an e-commerce store's support inbox (orders, shipping, returns).
 const TICKET_COUNT = 100;
 
 // [subject, body] pairs, grouped by the category a real classifier would
@@ -18,207 +23,202 @@ const TICKET_COUNT = 100;
 // that category is never guessed outside Phase 5's AI classification).
 const GENERAL_QUESTION: [string, string][] = [
    [
-      'How do I reset my account password?',
-      "I've tried the 'forgot password' link twice but never received the reset email. Can you help?",
+      'Do you ship internationally?',
+      "I'm based in Germany — do you ship outside the US, and roughly how long does delivery take?",
    ],
    [
-      "What's included in the Pro plan?",
-      'Trying to decide between Starter and Pro — could you send over a feature comparison?',
+      'Is the Denim Jacket true to size?',
+      'Trying to decide between a medium and a large — does it run small or large?',
    ],
    [
-      'Can I change my billing cycle to annual?',
-      "I'm currently on monthly billing and would like to switch to annual to save money.",
+      'Can I use two discount codes on one order?',
+      'I have a welcome code and a referral code — can both be applied at checkout?',
    ],
    [
-      'How do I add a teammate to my workspace?',
-      "I don't see an 'invite' option anywhere in the settings page.",
+      'Do gift cards expire?',
+      'Received a $50 gift card last year and want to make sure it’s still valid before I use it.',
    ],
    [
-      'Where can I download my invoice?',
-      'Need last month’s invoice for our accounting team but can’t find it in the billing tab.',
+      'How long does standard shipping take?',
+      'Just placed an order and want to know roughly when it should arrive.',
    ],
    [
-      'Is there a mobile app available?',
-      'We mostly work from our phones during the day — is there an iOS or Android app?',
+      'Can I change my shipping address after placing an order?',
+      'I entered my old address by mistake and the order hasn’t shipped yet.',
    ],
    [
-      'How do I export my ticket data to CSV?',
-      'Want to run some reporting outside the app. Is there a bulk export option?',
+      'Will the black hoodie in size L be restocked?',
+      'It’s been sold out for a couple weeks — any idea when more will come in?',
    ],
    [
-      'What happens to my data if I cancel?',
-      'Considering cancelling but want to know if our tickets get deleted immediately or archived.',
+      'What’s your return policy for clearance items?',
+      'Wondering if items bought during the clearance sale can still be returned.',
    ],
    [
-      'Do you offer a student discount?',
-      "I'm using this for a university project and was wondering if there's an education pricing tier.",
+      'Can two separate orders be combined into one shipment?',
+      'I placed two orders today by accident — can they ship together to save on fees?',
    ],
    [
-      'How do I change my account email address?',
-      'I switched jobs and need to update the email tied to my account.',
+      'Do you offer gift wrapping?',
+      'This order is a birthday present — is gift wrapping available at checkout?',
    ],
    [
-      'Can I use the API on the free plan?',
-      'Looking to build a small integration — is API access gated behind a paid plan?',
+      'Is my payment information stored securely?',
+      'Just want to confirm you don’t store full card numbers before I check out.',
    ],
    [
-      "What's your data retention policy?",
-      'Our compliance team is asking how long resolved tickets are kept before deletion.',
+      'Do you have a size chart for the running shoes?',
+      'Trying to figure out my size before ordering — my usual size varies between brands.',
    ],
    [
-      'How do I set up two-factor authentication?',
-      "I'd like to enable 2FA on my account but can't find the option under security settings.",
+      'How do I redeem a referral discount?',
+      'A friend sent me a referral link but I don’t see the discount applied at checkout.',
    ],
    [
-      'Do you support single sign-on (SSO)?',
-      'Our IT department requires SSO for any tool we adopt company-wide.',
+      'Can I pick up an online order in store?',
+      'I’m local to your Austin location — is in-store pickup an option?',
    ],
    [
-      'How do I transfer ownership of my workspace?',
-      "I'm leaving the company and need to hand off admin access to my manager.",
+      'Do you price-match other retailers?',
+      'Found the same jacket cheaper elsewhere — do you offer price matching?',
    ],
 ];
 
 const TECHNICAL_QUESTION: [string, string][] = [
    [
-      'Getting a 500 error when uploading attachments',
-      'Every time I try to attach a screenshot to a reply, the request fails with a server error.',
+      'Checkout page keeps freezing at the payment step',
+      'Tried three times and the cart just spins on "Processing Payment" and never completes.',
    ],
    [
-      'App crashes immediately after opening on iOS',
-      'Updated to the latest version last night and now the app closes within a second of opening.',
+      'Discount code says invalid even though it’s active',
+      'The code WELCOME10 worked for a friend yesterday but it’s rejected on my cart.',
    ],
    [
-      'Webhook events are not being delivered',
-      'Configured an outbound webhook for new tickets but our endpoint hasn’t received anything in 3 days.',
+      'Order tracking page shows no updates',
+      'Tracking number was emailed 4 days ago but the page still says "label created".',
    ],
    [
-      'Login page stuck on infinite loading spinner',
-      'The spinner just keeps spinning after I enter my credentials — tried three different browsers.',
+      'Can’t upload a photo for my return request',
+      'The return portal keeps failing when I try to attach a photo of the damaged item.',
    ],
    [
-      'API returns 429 errors even under low traffic',
-      "We're making maybe 10 requests a minute but keep hitting rate limits unexpectedly.",
+      'App crashes when I open my order history',
+      'Every time I tap "My Orders" in the app it closes immediately.',
    ],
    [
-      'Search results are missing recent tickets',
-      "Tickets created in the last 24 hours don't show up when I search by subject.",
+      'Wishlist items disappeared after the app update',
+      'Had about 15 items saved and they’re all gone since updating yesterday.',
    ],
    [
-      'Dashboard charts not rendering in Safari',
-      'Everything looks fine in Chrome, but the analytics charts are just blank in Safari on macOS.',
+      'Charged in the wrong currency at checkout',
+      'The site showed prices in USD but my card was charged in EUR at a strange rate.',
    ],
    [
-      'Email notifications arriving several hours late',
-      'By the time I get notified about a new reply, the customer has already followed up twice.',
+      'Can’t apply store credit to my order',
+      'I have $30 in store credit but there’s no option to use it during checkout.',
    ],
    [
-      'Cannot upload files larger than 5MB',
-      'Trying to attach a short screen recording but it fails silently with no error message.',
+      'Search results don’t match what I typed',
+      'Searching "blue backpack" brings up completely unrelated items.',
    ],
    [
-      'Slack integration disconnected after last update',
-      'Our #support channel stopped getting ticket alerts right after the update rolled out.',
+      'Never received an order confirmation email',
+      'Payment shows on my bank statement but I never got a confirmation email.',
    ],
    [
-      'CSV export is truncating long descriptions',
-      'Any ticket body over ~200 characters gets cut off in the exported file.',
+      'Size filter isn’t working on the website',
+      'Filtering by size "M" still shows items in every size.',
    ],
    [
-      'Two-factor codes not being accepted',
-      'My authenticator app codes are being rejected even though the time looks synced correctly.',
+      'Saved payment card won’t stay saved',
+      'I’ve tried adding my card three times and it just doesn’t save to my account.',
    ],
    [
-      'Session keeps expiring after a few minutes',
-      "I'm getting logged out every 5 minutes or so, even while actively using the app.",
+      'Live chat widget won’t load on mobile',
+      'The chat bubble shows up on desktop but never appears when I browse from my phone.',
    ],
    [
-      'Dark mode toggle not saving my preference',
-      'I switch to dark mode, refresh the page, and it resets back to light every time.',
-   ],
-   [
-      'Bulk delete button does nothing when clicked',
-      'Selected several old tickets and hit "Delete selected" but nothing happens.',
+      'Received someone else’s order confirmation email',
+      'Got an email confirming an order I never placed, with someone else’s address on it.',
    ],
 ];
 
 const REFUND_REQUEST: [string, string][] = [
    [
-      'Requesting a refund for accidental duplicate charge',
-      'I was charged twice for this month’s subscription — can you refund the duplicate?',
+      'Received the wrong item in my order',
+      'Ordered the navy blue backpack but received a red one instead — need a replacement or refund.',
    ],
    [
-      'Charged twice for the same subscription this month',
-      'My card statement shows two identical charges from you on the same day.',
+      'Item arrived damaged',
+      'The ceramic mug was shattered inside the box when it arrived — requesting a refund.',
    ],
    [
-      'Want a refund after cancelling within the trial period',
-      'I cancelled two days into the trial but was still charged the full amount.',
+      'Package shows delivered but never arrived',
+      'Tracking says it was delivered yesterday but there’s nothing at my door — need a refund or reship.',
    ],
    [
-      'Billed for a plan I never upgraded to',
-      'I’m on the Starter plan but was billed at the Pro rate this cycle.',
+      'Charged twice for the same order',
+      'My bank statement shows two identical charges for order #48213.',
    ],
    [
-      'Refund request — service was unusable for a week',
-      'The outage last week meant we couldn’t use the product at all — requesting a partial refund.',
+      'Want to return an item that doesn’t fit',
+      'The jacket I ordered runs too small — is a refund possible within your return window?',
    ],
    [
-      'Please refund my annual plan, switching providers',
-      "We've decided to move to a different tool and would like a pro-rated refund on the annual plan.",
+      'Refund never processed after my return was received',
+      'Returned the shoes three weeks ago and tracking confirms delivery, but no refund yet.',
    ],
    [
-      'Charged after I already cancelled my subscription',
-      'I cancelled last month through the billing portal but was charged again yesterday.',
+      'Order was cancelled but I was still charged',
+      'Cancelled within the hour like the site says is allowed, but the charge still went through.',
    ],
    [
-      'Requesting partial refund for downtime last week',
-      'Given the extended downtime, could we get a credit or partial refund for that period?',
+      'Wrong size shipped for a pre-order',
+      'Pre-ordered a size 9 but received a size 7 once it finally shipped.',
    ],
    [
-      'Refund needed — wrong card was charged',
-      'An old, cancelled card on file was charged instead of my current one — please refund and update it.',
+      'Refund requested for a late delivery',
+      'Paid extra for express shipping but it arrived 6 days late — requesting a shipping refund.',
    ],
    [
-      "Overcharged due to a coupon that didn't apply",
-      'I applied a 20% discount code at checkout but was still charged the full price.',
+      'Missing item from a multi-item order',
+      'The order confirmation listed 3 items but only 2 arrived in the box.',
    ],
    [
-      'Refund request for unused seats on my plan',
-      "We downsized our team but are still being billed for seats we're not using.",
+      'Refund for a discontinued item that never shipped',
+      'Ordered a listed item that turned out to be discontinued — money was taken but nothing shipped.',
    ],
    [
-      'Accidentally purchased the wrong plan tier',
-      'Meant to buy Starter but clicked Enterprise by mistake — can this be refunded and corrected?',
+      'Double charged after using a gift card and a credit card',
+      'Used a gift card plus my credit card, but it looks like both were charged the full amount.',
    ],
    [
-      "Requesting refund — product didn't meet expectations",
-      "This isn't quite what we needed for our team — is a refund possible within 14 days of purchase?",
+      'Requesting a refund — quality doesn’t match the photos',
+      'The fabric feels completely different from what was shown on the product page.',
    ],
    [
-      'Double billed after updating my payment method',
-      'Updated my card last week and got charged on both the old and new card.',
-   ],
-   [
-      'Refund request for a renewal I forgot to cancel',
-      'I meant to cancel before the renewal date but missed it by a day — any chance of a refund?',
+      'Return label was never emailed to me',
+      'Requested a return three days ago and still haven’t received the prepaid shipping label.',
    ],
 ];
 
 const UNCATEGORIZED: [string, string][] = [
    [
-      'Question about my account',
-      'Hi, I had a question about my account, can someone get back to me?',
+      'Question about my order',
+      'Hi, I have a question about an order I placed, can someone help?',
    ],
    ['Need help ASAP', 'This is urgent, please respond as soon as you can.'],
    [
-      'Following up on my previous email',
-      "Just following up since I haven't heard back yet — any update?",
+      'Following up on my order',
+      'Just following up since I haven’t heard back yet — any update?',
    ],
-   ['Quick question', 'Hey, quick question when you get a chance.'],
    [
-      'Issue with my account',
-      "Something's wrong with my account, not sure what exactly.",
+      'Quick question',
+      'Hey, quick question about my recent purchase when you get a chance.',
+   ],
+   [
+      'Issue with my order',
+      'Something’s wrong with my order, not totally sure what.',
    ],
    ['Help needed', 'Could really use some help with something on my end.'],
    ['Re: your email', 'Replying to your last message — see below for context.'],
@@ -226,39 +226,42 @@ const UNCATEGORIZED: [string, string][] = [
       'Urgent - please respond',
       'Marking this urgent, please get back to me soon.',
    ],
-   ['Problem', "I'm having a problem and I'm not sure who else to contact."],
+   [
+      'Problem with my package',
+      'I’m having a problem with my package and not sure who else to contact.',
+   ],
    [
       'Can someone assist me?',
       'Not sure if this is the right place, but could someone assist me?',
    ],
 ];
 
-// Realistic-looking sender pool, reused across tickets (mirrors real
+// Realistic-looking customer pool, reused across tickets (mirrors real
 // support inboxes where the same customer files more than one ticket).
 const SENDERS: [string, string][] = [
-   ['Emily Chen', 'emily.chen@northwind.io'],
-   ['Marcus Webb', 'marcus.webb@brightpath.co'],
+   ['Emily Chen', 'emily.chen88@gmail.com'],
+   ['Marcus Webb', 'marcus.webb@yahoo.com'],
    ['Priya Nair', 'priya.nair@outlook.com'],
    ['Diego Alvarez', 'diego.alvarez@gmail.com'],
-   ['Sofia Rossi', 'sofia.rossi@vertexlabs.com'],
+   ['Sofia Rossi', 'sofia.rossi@icloud.com'],
    ['Tom Baker', 'tom.baker@yahoo.com'],
-   ['Aisha Khan', 'aisha.khan@cloudnine.dev'],
+   ['Aisha Khan', 'aisha.khan21@gmail.com'],
    ["Liam O'Connor", 'liam.oconnor@gmail.com'],
-   ['Hana Suzuki', 'hana.suzuki@meridian.jp'],
+   ['Hana Suzuki', 'hana.suzuki@icloud.com'],
    ['Carlos Mendes', 'carlos.mendes@outlook.com'],
-   ['Grace Kim', 'grace.kim@stellarworks.com'],
+   ['Grace Kim', 'grace.kim.retail@gmail.com'],
    ['Noah Fischer', 'noah.fischer@gmail.com'],
    ['Fatima Al-Sayed', 'fatima.alsayed@icloud.com'],
-   ['Ethan Brooks', 'ethan.brooks@brightpath.co'],
-   ['Mei Lin', 'mei.lin@northwind.io'],
+   ['Ethan Brooks', 'ethan.brooks@yahoo.com'],
+   ['Mei Lin', 'mei.lin.shops@gmail.com'],
    ['Oliver Bennett', 'oliver.bennett@gmail.com'],
-   ['Zara Ahmed', 'zara.ahmed@vertexlabs.com'],
+   ['Zara Ahmed', 'zara.ahmed@outlook.com'],
    ['Lucas Silva', 'lucas.silva@outlook.com'],
-   ['Ingrid Larsen', 'ingrid.larsen@meridian.jp'],
+   ['Ingrid Larsen', 'ingrid.larsen@icloud.com'],
    ['Ravi Patel', 'ravi.patel@gmail.com'],
-   ['Chloe Martin', 'chloe.martin@stellarworks.com'],
+   ['Chloe Martin', 'chloe.martin@gmail.com'],
    ['Ben Turner', 'ben.turner@icloud.com'],
-   ['Nadia Petrova', 'nadia.petrova@cloudnine.dev'],
+   ['Nadia Petrova', 'nadia.petrova@yahoo.com'],
    ['Sam Okafor', 'sam.okafor@gmail.com'],
    ['Ji-woo Park', 'jiwoo.park@yahoo.com'],
 ];
@@ -306,6 +309,14 @@ function randomRecentDate(): Date {
 }
 
 async function main() {
+   // Non-admin users seeded by seed-users.ts, so non-open tickets can look
+   // like a real queue with agents actually assigned to them. Falls back
+   // to leaving everything unassigned if that script hasn't been run yet.
+   const agents = await prisma.user.findMany({
+      where: { role: Role.user, deletedAt: null },
+      select: { id: true },
+   });
+
    const rows: Prisma.TicketCreateManyInput[] = [];
 
    for (let i = 0; i < TICKET_COUNT; i++) {
@@ -315,6 +326,13 @@ async function main() {
       const status = pickWeighted(STATUS_WEIGHTS);
       const createdAt = randomRecentDate();
 
+      const assignedToId =
+         status !== TicketStatus.open &&
+         agents.length > 0 &&
+         Math.random() < 0.7
+            ? pickRandom(agents).id
+            : null;
+
       rows.push({
          subject,
          body,
@@ -322,6 +340,7 @@ async function main() {
          senderEmail,
          category,
          status,
+         assignedToId,
          createdAt,
          updatedAt: createdAt,
       });

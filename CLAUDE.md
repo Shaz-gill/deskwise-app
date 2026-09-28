@@ -8,7 +8,7 @@ Deskwise: an AI-powered support ticket management system (see `docs/project-scop
 
 Auth, user management, and ticket CRUD (list/detail/reply, assignment, status/category updates, inbound-email webhook intake) are built end-to-end — see Architecture below. Of the planned AI features, reply-polishing and ticket-summarization exist so far (`routes/tickets.ts`'s `POST /:id/replies/polish` and `POST /:id/summarize`, see Architecture) — both call OpenAI via LangChain (model configurable via `OPENAI_MODEL`, default `gpt-5-nano`; see `lib/openai-model.ts`), not the Claude API `docs/tech-stack.md` calls for; classification and suggested-reply-drafting are still unimplemented. **All AI features, current and future, must go through LangChain** (`@langchain/core`/`@langchain/openai`, per `lib/openai-model.ts`) rather than a provider SDK called directly — this is a deliberate standing choice, not just how the existing two features happen to be built. Real email-provider ingestion (SendGrid/Mailgun — today there's only a generic secret-gated JSON webhook, not a provider-specific parser) and the dashboard are also not implemented yet (`/` renders a placeholder `HomePage`). `docs/implementation-plan.md` has the intended build order (auth → user management → ticket CRUD → AI features → email → dashboard), and `docs/tech-stack.md` has the intended stack (Postgres + Prisma, session auth, SendGrid/Mailgun, Claude API). Check these docs for intent before assuming current code reflects the target design.
 
-`docs/` (root) covers product scope/stack/plan. There are no per-package setup docs under `packages/server/docs/` or `packages/client/docs/` (removed as unnecessary) — for Prisma/Better Auth/shadcn setup, use the tools' own docs or read the actual config.
+`docs/` (root) covers product scope/stack/plan. There are no per-package setup docs under `packages/server/docs/` or `packages/client/docs/` (removed as unnecessary) — for Prisma/Better Auth/shadcn setup, use the tools' own docs or read the actual config. The one exception is `packages/server/prisma/scripts/README.md`, a runbook for resetting the database (drop-and-recreate vs. `prisma migrate reset`) and reseeding in order — check it before improvising `psql`/`prisma migrate` commands by hand.
 
 ## Simplicity
 
@@ -36,7 +36,7 @@ Server (`packages/server`):
 - Create/apply a migration after a schema change: `bunx prisma migrate dev --name <migration-name>`
 - Open Prisma Studio: `bunx prisma studio`
 - Regenerate Better Auth's required models into `schema.prisma` after changing `lib/auth.ts`: `bunx @better-auth/cli@latest generate` (then run the migrate command above)
-- Seed the initial admin user: `bun run seed`. Seed sample tickets/replies for local testing: `bun run seed:tickets`
+- Seed the initial admin user (from `ADMIN_EMAIL`/`ADMIN_PASSWORD`, for a real deployment): `bun run seed`. Seed a realistic demo user roster — one admin (Shaz Gill) plus 14 regular agents, all sharing a fixed demo password, safe to re-run (`prisma/scripts/seed-users.ts`): `bun run seed:users`. Seed sample e-commerce-support tickets for local testing, optionally assigned to whichever agents `seed:users` created (`prisma/scripts/seed-tickets.ts`; every run adds more rows, on purpose): `bun run seed:tickets`
 
 Client (`packages/client`):
 

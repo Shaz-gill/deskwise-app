@@ -1,7 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import type { TicketCategory, TicketStatus } from 'core';
-import { CalendarPlus, RefreshCw } from 'lucide-react';
+import { CalendarPlus, MailIcon, RefreshCw, UserIcon } from 'lucide-react';
 import moment from 'moment';
 import type { ApiTicketDetail } from '../../pages/TicketDetailPage';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
@@ -53,10 +53,12 @@ export function TicketDetail({ ticket }: { ticket: ApiTicketDetail }) {
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
                <div className="flex items-start justify-between gap-4 text-sm">
-                  <div className="flex flex-col">
+                  <div className="grid grid-cols-[auto_1fr] items-center gap-x-1.5 gap-y-1">
+                     <UserIcon className="size-3.5 text-muted-foreground" />
                      <span className="text-foreground">
                         {ticket.senderName}
                      </span>
+                     <MailIcon className="size-3.5 text-muted-foreground" />
                      <span className="text-xs text-muted-foreground">
                         {ticket.senderEmail}
                      </span>
