@@ -28,6 +28,7 @@ Support emails become tickets that are auto-classified, summarized, and given AI
 - [Security](#security)
 - [Getting Started](#getting-started)
 - [Project Structure](#project-structure)
+- [Development Process](#development-process)
 - [Roadmap](#roadmap)
 - [License](#license)
 
@@ -246,10 +247,18 @@ This section documents the actual mechanisms in the codebase, not a generic chec
 
 ## Getting Started
 
-**Prerequisites:** [Bun](https://bun.sh), a PostgreSQL database (a free hosted instance works fine — see the tip in `packages/server/prisma/schema.prisma`), an OpenAI API key, and a Pinecone account with an index already created.
+**Prerequisites:**
+
+- [Bun](https://bun.sh) — install with:
+  ```bash
+  curl -fsSL https://bun.sh/install | bash
+  ```
+- A PostgreSQL database (a free hosted instance works fine — see the tip in `packages/server/prisma/schema.prisma`)
+- An OpenAI API key
+- A Pinecone account with an index already created
 
 ```bash
-# 1. Clone and install
+# 1. Clone the repo and install workspace dependencies (root, server, client, core — all at once)
 git clone <this-repo>
 cd desky
 bun install
@@ -312,6 +321,16 @@ desky/
 │   └── core/             # shared Zod schemas + const-object enums
 └── docs/                 # product scope, tech stack, implementation plan
 ```
+
+## Development Process
+
+[![Built with Claude Code](https://img.shields.io/badge/Built_with-Claude_Code-D97757?logo=claude&logoColor=white)](https://claude.com/claude-code)
+
+This project was built with [Claude Code](https://claude.com/claude-code), Anthropic's agentic coding CLI, used deliberately as an engineering tool rather than a shortcut — worth stating plainly, since "do you actually know how to work with AI coding tools" is a question that comes up directly in interviews.
+
+To be specific about what that meant in practice: this wasn't vibe coding. Every non-trivial feature went through an explicit **plan-before-code** process — research the existing codebase and its conventions first, design an approach, review it, *then* implement — rather than accepting the first thing generated. Implementations were **verified by actually running the app**, not just by reading the code and trusting it: the RAG ingestion pipeline was tested through real uploads against a real Pinecone index, edge cases like invalid file types, oversized uploads, and non-admin access were exercised directly against a running server, and a real bug in the seed script's idempotency logic was caught — and fixed — by deliberately reproducing a fresh-clone scenario instead of assuming the happy path was the only path. The codebase also went through a dedicated simplification pass afterward to find and remove unnecessary complexity, not just to add features and move on.
+
+The goal wasn't "AI wrote this app" — it's using AI the way a competent engineer uses any powerful tool: with a plan, with verification, and with judgment about what's actually good enough to ship.
 
 ## Roadmap
 
