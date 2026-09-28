@@ -1,11 +1,11 @@
 import { Role } from 'core';
 import {
+   BookOpenIcon,
    ChevronDownIcon,
    LayoutDashboardIcon,
    LogOutIcon,
    MenuIcon,
    MoonIcon,
-   SettingsIcon,
    SunIcon,
    TicketIcon,
    UserIcon,
@@ -141,14 +141,20 @@ export function NavBar() {
                         </Button>
                      }
                   />
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="min-w-44">
                      {data?.user?.role === Role.admin && (
-                        <DropdownMenuItem onClick={() => navigate('/settings')}>
-                           <SettingsIcon />
-                           Settings
+                        <DropdownMenuItem
+                           onClick={() => navigate('/settings')}
+                           className="whitespace-nowrap"
+                        >
+                           <BookOpenIcon />
+                           Knowledge Base
                         </DropdownMenuItem>
                      )}
-                     <DropdownMenuItem onClick={handleSignOut}>
+                     <DropdownMenuItem
+                        onClick={handleSignOut}
+                        className="whitespace-nowrap"
+                     >
                         <LogOutIcon />
                         Sign out
                      </DropdownMenuItem>

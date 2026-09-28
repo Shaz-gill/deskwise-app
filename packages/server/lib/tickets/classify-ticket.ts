@@ -1,7 +1,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { z } from 'zod';
-import { TicketCategory } from '../generated/prisma/enums';
+import { TicketCategory } from '../../generated/prisma/enums';
 
 const model = new ChatOpenAI({ model: 'gpt-5-nano' });
 

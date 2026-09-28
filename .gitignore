@@ -6,6 +6,9 @@ out
 dist
 *.tgz
 
+# uploaded knowledge base documents (see packages/server/lib/knowledge-base-path.ts)
+/knowledge-base
+
 # code coverage
 coverage
 *.lcov

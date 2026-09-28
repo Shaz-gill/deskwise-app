@@ -10,8 +10,11 @@ import { errorHandler } from './middleware/error-handler';
 import { isTrustedOrigin } from './lib/trusted-origins';
 import { usersRouter } from './routes/users';
 import { ticketsRouter } from './routes/tickets';
+import { knowledgeDocsRouter } from './routes/knowledge-docs';
 import { startQueue } from './lib/queue';
+import { ensureKnowledgeBaseDir } from './lib/knowledge-base/path';
 import { registerClassifyTicketWorker } from './jobs/classify-ticket-job';
+import { registerIngestDocumentWorker } from './jobs/ingest-document-job';
 
 dotenv.config();
 
@@ -51,12 +54,17 @@ app.use(express.json());
 
 app.use('/api/users', usersRouter);
 app.use('/api/tickets', ticketsRouter);
+app.use('/api/knowledge-docs', knowledgeDocsRouter);
 
-// pg-boss needs boss.start() before any send()/work() call, and the
-// classify-ticket worker needs to be registered once — both run here,
-// in order, before the server starts accepting traffic.
+// pg-boss needs boss.start() before any send()/work() call, and each
+// worker needs to be registered once — both run here, in order, before the
+// server starts accepting traffic.
 await startQueue();
 await registerClassifyTicketWorker();
+await registerIngestDocumentWorker();
+
+// Uploaded knowledge base files are saved here (see routes/knowledge-docs.ts)
+await ensureKnowledgeBaseDir();
 
 app.use(errorHandler);
 

@@ -1,6 +1,6 @@
 import type { Job } from 'pg-boss';
 import prisma from '../db';
-import { classifyTicket } from '../lib/classify-ticket';
+import { classifyTicket } from '../lib/tickets/classify-ticket';
 import { boss } from '../lib/queue';
 
 // Queue name shared between the producer (routes/tickets.ts's inbound-email

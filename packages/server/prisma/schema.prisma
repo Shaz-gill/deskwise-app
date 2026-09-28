@@ -18,12 +18,12 @@ enum Role {
 }
 
 model User {
-  id              String        @id
+  id              String         @id
   name            String
-  email           String        @unique
+  email           String         @unique
   emailVerified   Boolean
   image           String?
-  role            Role          @default(user)
+  role            Role           @default(user)
   deletedAt       DateTime?
   createdAt       DateTime
   updatedAt       DateTime
@@ -31,6 +31,7 @@ model User {
   accounts        Account[]
   assignedTickets Ticket[]
   ticketReplies   TicketReply[]
+  knowledgeDocs   KnowledgeDoc[]
 
   @@map("user")
 }
@@ -126,4 +127,25 @@ model TicketReply {
   createdAt  DateTime              @default(now())
 
   @@map("ticket_reply")
+}
+
+enum KnowledgeDocStatus {
+  processing
+  ready
+  failed
+}
+
+model KnowledgeDoc {
+  id           Int                @id @default(autoincrement())
+  filename     String
+  path         String
+  status       KnowledgeDocStatus @default(processing)
+  chunkCount   Int                @default(0)
+  error        String?
+  uploadedById String
+  uploadedBy   User               @relation(fields: [uploadedById], references: [id])
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  @@map("knowledge_doc")
 }

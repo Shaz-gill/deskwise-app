@@ -23,3 +23,5 @@ export const inboundEmailLimiter = createLimiter(50);
 export const polishLimiter = createLimiter(20);
 
 export const summarizeLimiter = createLimiter(20);
+
+export const knowledgeUploadLimiter = createLimiter(10);
