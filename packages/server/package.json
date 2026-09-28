@@ -9,6 +9,7 @@
       "seed": "bun run prisma/scripts/seed.ts",
       "seed:users": "bun run prisma/scripts/seed-users.ts",
       "seed:tickets": "bun run prisma/scripts/seed-tickets.ts",
+      "seed:knowledge-base": "bun run prisma/scripts/seed-knowledge-base.ts",
       "queue:status": "bun run prisma/scripts/queue-status.ts"
    },
    "devDependencies": {
@@ -17,6 +18,7 @@
       "@types/express": "^5.0.6",
       "@types/jsdom": "^30.0.0",
       "@types/multer": "^2.2.0",
+      "pdf-lib": "^1.17.1",
       "prisma": "^7.9.1"
    },
    "peerDependencies": {

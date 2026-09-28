@@ -38,10 +38,18 @@ for you. It'll ask for confirmation; confirm it.
 ## Seeding, in order
 
 ```bash
-bun run seed          # admin user from ADMIN_EMAIL/ADMIN_PASSWORD — idempotent, safe to re-run
-bun run seed:users    # demo roster: admin "Shaz Gill" + 14 agents — idempotent, safe to re-run
-bun run seed:tickets  # 100 demo e-commerce tickets — NOT idempotent, adds more rows every run
+bun run seed               # admin user from ADMIN_EMAIL/ADMIN_PASSWORD — idempotent, safe to re-run
+bun run seed:users         # demo roster: admin "Shaz Gill" + 14 agents — idempotent, safe to re-run
+bun run seed:tickets       # 100 demo e-commerce tickets — NOT idempotent, adds more rows every run
+bun run seed:knowledge-base # 6 demo policy PDFs (shipping, returns, etc.) — idempotent, safe to re-run
 ```
 
 `seed:tickets` looks up whichever users `seed:users` created to assign
 non-open tickets to real agents, so run `seed:users` first if you want that.
+`seed:knowledge-base` needs at least one user to exist (run `seed` or
+`seed:users` first) to attribute the docs to, and ingests each PDF into
+Pinecone directly (bypassing the app's pg-boss queue, since no server is
+running) — it needs `PINECONE_API_KEY`/`PINECONE_INDEX_NAME`/`OPENAI_API_KEY`
+set in `.env` and an existing Pinecone index matching the embedding model's
+dimension (see `packages/server/lib/knowledge-base/pinecone.ts`), or each
+doc will be created with `status: failed` and a clear error message instead.
