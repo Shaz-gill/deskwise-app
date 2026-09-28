@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
 import { TicketReplies } from './TicketReplies';
+import { TicketSummary } from './TicketSummary';
 
 export type TicketUpdatePayload = {
    assignedToId?: string | null;
@@ -77,6 +78,8 @@ export function TicketDetail({ ticket }: { ticket: ApiTicketDetail }) {
                <p className="whitespace-pre-wrap text-sm text-foreground">
                   {ticket.body}
                </p>
+
+               <TicketSummary ticketId={ticketId} />
 
                <Separator />
 

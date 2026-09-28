@@ -14,6 +14,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
 
 // ------------------------------------------------------------------------
+// GET /api/users (requireAuth, requireAdmin)
 // List users (paginated, searchable by email), excludes soft-deleted users
 
 usersRouter.get(
@@ -58,6 +59,7 @@ usersRouter.get(
 );
 
 // ------------------------------------------------------------------------
+// GET /api/users/assignable (requireAuth)
 // List users assignable to a ticket — unpaginated, open to any
 // authenticated user (not just admins), since ticket assignment itself
 // (routes/tickets.ts's PATCH /:id) isn't admin-gated either
@@ -77,6 +79,7 @@ usersRouter.get(
 );
 
 // ------------------------------------------------------------------------
+// POST /api/users (requireAuth, requireAdmin)
 // Create a user with a credential account (admin-provisioned, no sign-up)
 
 usersRouter.post(
@@ -127,6 +130,7 @@ usersRouter.post(
 );
 
 // ------------------------------------------------------------------------
+// PATCH /api/users/:id (requireAuth, requireAdmin)
 // Update a user's name/email, and optionally reset their password
 
 usersRouter.patch(
@@ -173,6 +177,7 @@ usersRouter.patch(
 );
 
 // ------------------------------------------------------------------------
+// DELETE /api/users/:id (requireAuth, requireAdmin)
 // Soft-delete a user (admin accounts are protected)
 
 usersRouter.delete(

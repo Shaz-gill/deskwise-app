@@ -32,9 +32,11 @@ app.use(
    })
 );
 
-// Better Auth handler must be mounted BEFORE express.json() — it reads the
-// raw request body itself, so express.json() would otherwise consume the
-// stream first and leave nothing for it to parse.
+// ALL /api/auth/* (authLimiter — no requireAuth, since this *is* the
+// sign-in/sign-up/sign-out/session endpoint group Better Auth generates).
+// Must be mounted BEFORE express.json() — it reads the raw request body
+// itself, so express.json() would otherwise consume the stream first and
+// leave nothing for it to parse.
 app.all(
    '/api/auth/{*any}',
    authLimiter,

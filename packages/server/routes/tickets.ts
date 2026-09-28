@@ -11,11 +11,13 @@ import { Prisma } from '../generated/prisma/client';
 import { TicketCategory, TicketStatus } from '../generated/prisma/enums';
 import { polishReply } from '../lib/polish-reply';
 import { sanitizeHtml } from '../lib/sanitize-html';
+import { summarizeTicket } from '../lib/summarize-ticket';
 import { validateBody } from '../lib/validate';
 import { requireAuth } from '../middleware/require-auth';
 import {
    inboundEmailLimiter,
    polishLimiter,
+   summarizeLimiter,
 } from '../middleware/rate-limiters';
 import { verifyWebhookSecret } from '../middleware/verify-webhook-secret';
 
@@ -65,6 +67,7 @@ const DEFAULT_PAGE_SIZE = 10;
 const MAX_PAGE_SIZE = 100;
 
 // ------------------------------------------------------------------------
+// GET /api/tickets (requireAuth)
 // List tickets (paginated, sortable, filterable by subject/status/category)
 
 ticketsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
@@ -128,6 +131,7 @@ ticketsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
 });
 
 // ------------------------------------------------------------------------
+// GET /api/tickets/:id (requireAuth)
 // Fetch a single ticket with its replies
 
 ticketsRouter.get('/:id', requireAuth, async (req: Request, res: Response) => {
@@ -159,6 +163,7 @@ ticketsRouter.get('/:id', requireAuth, async (req: Request, res: Response) => {
 });
 
 // ------------------------------------------------------------------------
+// PATCH /api/tickets/:id (requireAuth)
 // Update a ticket's assignee, status, and/or category
 
 ticketsRouter.patch(
@@ -200,6 +205,7 @@ ticketsRouter.patch(
 );
 
 // ------------------------------------------------------------------------
+// POST /api/tickets/:id/replies (requireAuth)
 // Add a reply to a ticket
 
 ticketsRouter.post(
@@ -234,6 +240,7 @@ ticketsRouter.post(
 );
 
 // ------------------------------------------------------------------------
+// POST /api/tickets/:id/replies/polish (requireAuth, polishLimiter)
 // Polish a draft reply with AI before sending
 
 ticketsRouter.post(
@@ -279,6 +286,70 @@ ticketsRouter.post(
 );
 
 // ------------------------------------------------------------------------
+// POST /api/tickets/:id/summarize (requireAuth, summarizeLimiter)
+// Summarize a ticket's subject/body/replies with AI
+
+ticketsRouter.post(
+   '/:id/summarize',
+   requireAuth,
+   summarizeLimiter,
+   async (req: Request, res: Response) => {
+      // Same numeric-id narrowing as GET/PATCH /:id.
+      const idParam = req.params.id;
+      const id =
+         typeof idParam === 'string' ? Number.parseInt(idParam, 10) : NaN;
+      if (!Number.isInteger(id)) {
+         res.status(400).json({ error: 'Invalid ticket id' });
+         return;
+      }
+
+      try {
+         // Minimal select (not the full TICKET_SELECT) — only
+         // subject/body/replies feed the prompt, no need for
+         // assignedTo/status/etc. here. TICKET_REPLY_SELECT is already
+         // imported above for GET /:id's own embed.
+         const ticket = await prisma.ticket.findUnique({
+            where: { id },
+            select: {
+               subject: true,
+               body: true,
+               replies: {
+                  select: TICKET_REPLY_SELECT,
+                  orderBy: { createdAt: 'asc' },
+               },
+            },
+         });
+         if (!ticket) {
+            res.status(404).json({ error: 'Ticket not found' });
+            return;
+         }
+
+         const summary = await summarizeTicket({
+            ticketSubject: ticket.subject,
+            ticketBody: ticket.body,
+            replies: ticket.replies.map((reply) => ({
+               senderType: reply.senderType,
+               authorName: reply.author.name,
+               body: reply.body,
+               createdAt: reply.createdAt,
+            })),
+         });
+
+         res.json({ summary });
+      } catch (err) {
+         // No Prisma error to map beyond the findUnique above — anything
+         // reaching this catch is an OpenAI/network failure from
+         // summarizeTicket(), same as polish-reply.ts's route.
+         console.error('Failed to summarize ticket:', err);
+         res.status(500).json({ error: 'Failed to summarize ticket' });
+      }
+   }
+);
+
+// ------------------------------------------------------------------------
+// POST /api/tickets/inbound-email (inboundEmailLimiter, verifyWebhookSecret
+// — no requireAuth, since the caller is an email provider, not a signed-in
+// user)
 // Webhook: create a ticket from an inbound support email (or reuse an
 // existing open ticket for the same sender/subject)
 
