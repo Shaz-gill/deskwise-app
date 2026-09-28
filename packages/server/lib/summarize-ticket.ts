@@ -1,7 +1,5 @@
-import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
-
-const model = new ChatOpenAI({ model: 'gpt-5-nano' });
+import { openAiModel } from './openai-model';
 
 const SYSTEM_PROMPT =
    'You are helping a customer support agent quickly understand a ' +
@@ -40,7 +38,7 @@ export async function summarizeTicket({
               )
               .join('\n\n');
 
-   const response = await model.invoke([
+   const response = await openAiModel.invoke([
       new SystemMessage(SYSTEM_PROMPT),
       new HumanMessage(
          `Ticket subject: ${ticketSubject}\n\n` +
