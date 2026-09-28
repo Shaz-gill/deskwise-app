@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { TicketCategory } from './ticket-category';
-import { TicketStatus } from './ticket-status';
+import { HUMAN_TICKET_STATUSES } from './ticket-status';
 
 export const loginSchema = z.object({
    email: z.string().min(1, 'Email is required').email('Enter a valid email'),
@@ -55,7 +55,7 @@ export type InboundEmailPayload = z.infer<typeof inboundEmailSchema>;
 
 export const updateTicketSchema = z.object({
    assignedToId: z.string().nullable().optional(),
-   status: z.enum(Object.values(TicketStatus)).optional(),
+   status: z.enum(HUMAN_TICKET_STATUSES).optional(),
    category: z.enum(Object.values(TicketCategory)).nullable().optional(),
 });
 export type UpdateTicketPayload = z.infer<typeof updateTicketSchema>;

@@ -14,6 +14,7 @@ import { knowledgeDocsRouter } from './routes/knowledge-docs';
 import { startQueue } from './lib/queue';
 import { ensureKnowledgeBaseDir } from './lib/knowledge-base/path';
 import { registerClassifyTicketWorker } from './jobs/classify-ticket-job';
+import { registerAutoResolveTicketWorker } from './jobs/auto-resolve-ticket-job';
 import { registerIngestDocumentWorker } from './jobs/ingest-document-job';
 
 dotenv.config();
@@ -61,6 +62,7 @@ app.use('/api/knowledge-docs', knowledgeDocsRouter);
 // server starts accepting traffic.
 await startQueue();
 await registerClassifyTicketWorker();
+await registerAutoResolveTicketWorker();
 await registerIngestDocumentWorker();
 
 // Uploaded knowledge base files are saved here (see routes/knowledge-docs.ts)

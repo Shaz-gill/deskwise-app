@@ -1,4 +1,4 @@
-import { Contact, ShieldCheck, User, type LucideIcon } from 'lucide-react';
+import { Bot, Contact, ShieldCheck, User, type LucideIcon } from 'lucide-react';
 import {
    Role,
    TicketCategory,
@@ -14,6 +14,12 @@ export const STATUS_BADGE_VARIANT: Record<
    TicketStatus,
    'default' | 'secondary' | 'outline'
 > = {
+   // Never actually rendered — 'new'/'processing' tickets never reach the
+   // client (see routes/tickets.ts's GET / and the auto-resolve pipeline) —
+   // included only because TicketStatus's full union requires an
+   // exhaustive Record.
+   [TicketStatus.New]: 'outline',
+   [TicketStatus.Processing]: 'outline',
    [TicketStatus.Open]: 'default',
    [TicketStatus.Resolved]: 'secondary',
    [TicketStatus.Closed]: 'outline',
@@ -30,6 +36,9 @@ export function getReplySenderInfo(
    icon: LucideIcon;
    badgeVariant: 'default' | 'secondary' | 'outline';
 } {
+   if (senderType === TicketReplySenderType.ai) {
+      return { label: 'AI Assistant', icon: Bot, badgeVariant: 'default' };
+   }
    if (senderType === TicketReplySenderType.customer) {
       return { label: 'Customer', icon: Contact, badgeVariant: 'secondary' };
    }

@@ -36,7 +36,7 @@ Support emails become tickets that are auto-classified, summarized, and given AI
 
 ## Overview
 
-Support teams drown in repetitive email traffic — the same shipping, returns, and account questions, answered one at a time. Deskwise turns inbound support email into a structured ticket queue, then uses AI to lighten the manual load at every step: tickets are auto-classified as they arrive, agents get one-click AI summaries of long threads, AI-polished replies that stay in the agent's own voice, and — via a retrieval-augmented knowledge base — replies that can be grounded in the team's own shipping/returns/policy documents instead of the model's guesswork.
+Support teams drown in repetitive email traffic — the same shipping, returns, and account questions, answered one at a time. Deskwise turns inbound support email into a structured ticket queue, then uses AI to lighten the manual load at every step: the moment a ticket arrives, it's checked against a retrieval-augmented knowledge base and **resolved automatically** — with a real, grounded email reply — if the knowledge base confidently answers it; everything else is auto-classified and left for an agent, who gets one-click AI summaries of long threads and AI-polished replies that stay in their own voice.
 
 It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma, a React admin/agent interface, and an async job pipeline (pg-boss) that keeps every LLM and vector-database call off the request path.
 
@@ -76,10 +76,11 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 - Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
+- 🤖 **Automatic resolution via RAG** — every new ticket is checked against the knowledge base the instant it arrives; if the retrieved excerpts fully and confidently answer it, a complete, ready-to-send email reply is generated and posted automatically (signed off "Customer Support") and the ticket is marked resolved — without ever landing in an agent's queue. Anything the knowledge base can't answer is left untouched and open for a human — see [How the RAG pipeline works](#how-the-rag-pipeline-works)
 - 🏷️ **Auto-classification** — every inbound ticket is classified (general question / technical question / refund request) asynchronously, without blocking the webhook response
 - 📝 **AI summaries** — one click to summarize a long ticket + reply thread for an agent picking it up cold
 - ✍️ **AI reply polish** — improves an agent's draft (grammar, clarity, tone) while preserving their own wording and intent
-- 📚 **Retrieval-augmented knowledge base** — admins upload PDF/DOCX/TXT/MD policy docs; they're chunked, embedded, and stored in Pinecone so future AI features can ground replies in the team's actual documentation instead of hallucinating
+- 📚 **Retrieval-augmented knowledge base** — admins upload PDF/DOCX/TXT/MD policy docs; they're chunked, embedded, and stored in Pinecone, powering the automatic resolution above instead of the model hallucinating an answer
 
 **User Management & Auth**
 - Session-based authentication (no public sign-up — admin-provisioned accounts only)
@@ -90,7 +91,7 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 
 Deskwise is a Bun workspace monorepo with three packages: `packages/server` (Express 5 API), `packages/client` (React 19 SPA), and `packages/core` (Zod schemas and const-object enums shared by both, so the client and server can never drift on validation rules or status values).
 
-The core architectural rule: **any request that would call an LLM or a vector database never blocks the HTTP response.** Ticket classification and knowledge-base ingestion are both handed off to [pg-boss](https://github.com/timgit/pg-boss) (a Postgres-backed job queue — no separate Redis/SQS infra needed) and processed by background workers, so a slow OpenAI call or a Pinecone hiccup can never make an API request hang.
+The core architectural rule: **any request that would call an LLM or a vector database never blocks the HTTP response.** Ticket classification, automatic resolution, and knowledge-base ingestion are all handed off to [pg-boss](https://github.com/timgit/pg-boss) (a Postgres-backed job queue — no separate Redis/SQS infra needed) and processed by background workers, so a slow OpenAI call or a Pinecone hiccup can never make an API request hang.
 
 ```mermaid
 flowchart TB
@@ -109,6 +110,7 @@ flowchart TB
 
     subgraph Async["Async job pipeline (pg-boss)"]
         ClassifyJob[classify-ticket job]
+        AutoResolveJob[auto-resolve-ticket job<br/>new → processing → resolved|open]
         IngestJob[ingest-document job]
     end
 
@@ -121,22 +123,40 @@ flowchart TB
     UI -->|HTTPS| Auth --> Routes
     Routes <--> DB
     Routes -->|enqueue, fire-and-forget| ClassifyJob
+    Routes -->|enqueue, fire-and-forget| AutoResolveJob
     Routes -->|enqueue, fire-and-forget| IngestJob
     ClassifyJob --> LC
+    AutoResolveJob -->|1. retrieve top-K chunks| Pinecone
+    AutoResolveJob -->|2. grounded decide + draft| LC
     IngestJob --> LC
     LC --> OpenAI
     IngestJob -->|extract → chunk → embed → upsert| Pinecone
     ClassifyJob --> DB
+    AutoResolveJob -->|reply + status| DB
     IngestJob --> DB
 ```
 
 **Key decisions worth knowing about:**
 
-- **LangChain-only AI access.** Every AI feature — chat completions and embeddings alike — goes through LangChain's abstractions (`@langchain/core`, `@langchain/openai`, `@langchain/pinecone`), never a provider SDK called directly. This is a deliberate standing rule, not incidental to how the first two features happened to be built.
-- **RAG ingestion pipeline.** An uploaded document is extracted (`pdf-parse` / `mammoth` / plain text read depending on type), chunked (~1000 characters with ~200 character overlap so no sentence is orphaned at a chunk boundary), embedded with `text-embedding-3-small`, and upserted into Pinecone with per-chunk metadata (`docId`, `filename`, `chunkIndex`, `uploadedAt`). Vector IDs are minted as `<docId>#<chunkIndex>` — a deliberate choice so that deleting a document can list-then-delete by ID prefix, since Pinecone serverless indexes don't reliably support metadata-filter deletion.
-- **Fail loud, never auto-provision.** If the configured Pinecone index doesn't exist, or its dimension doesn't match the embedding model's output, ingestion fails immediately with a clear, stored error message — the app never silently creates or resizes infrastructure on your behalf.
+- **LangChain-only AI access.** Every AI feature — chat completions and embeddings alike — goes through LangChain's abstractions (`@langchain/core`, `@langchain/openai`, `@langchain/pinecone`), never a provider SDK called directly. This is a deliberate standing rule, not incidental to how the first few features happened to be built.
+- **RAG ingestion pipeline.** An uploaded document is extracted (`pdf-parse` / `mammoth` / plain text read depending on type), chunked (~1000 characters with ~200 character overlap so no sentence is orphaned at a chunk boundary), embedded with `text-embedding-3-small`, and upserted into Pinecone with per-chunk metadata (`docId`, `filename`, `chunkIndex`, `uploadedAt`). Vector IDs are minted as `<docId>#<chunkIndex>` — a deliberate choice so that deleting a document can list-then-delete by ID prefix, since Pinecone serverless indexes don't reliably support metadata-filter deletion. See [How the RAG pipeline works](#how-the-rag-pipeline-works) for the retrieval half.
+- **Ticket auto-resolution is a state machine, not a flag.** `Ticket.status` gains two internal-only values, `new` and `processing`, used only while the auto-resolve pipeline is deciding what to do with a ticket — they're never shown in the UI and can never be set manually (the ticket list always excludes them, and edits to them are rejected server-side). A ticket lands on `resolved` (AI answered) or `open` (needs a human) once the attempt finishes, and from there on behaves exactly like a human-resolved or human-touched ticket — there's no separate "resolved by AI, hide forever" flag. An agent can still tell it apart from the reply thread itself, which carries an AI Assistant–authored reply.
+- **Fail loud, never auto-provision.** If the configured Pinecone index doesn't exist, or its dimension doesn't match the embedding model's output, ingestion (and auto-resolution's retrieval step) fails immediately with a clear error rather than the app silently creating or resizing infrastructure on your behalf — an auto-resolution failure specifically falls back to leaving the ticket `open` for a human, never stuck mid-pipeline.
 - **Soft delete over hard delete.** Deleting a user never removes the row — it sets `deletedAt`, revokes every session, and frees the email address for reuse by overwriting it, so ticket history stays intact for anyone who worked a ticket in the past.
 - **Local file storage today, object storage next.** Uploaded knowledge-base documents currently live on local disk (gitignored) — the deliberate, simplest option for the current stage. Migrating to S3 is planned once the app moves onto AWS infrastructure (see [Roadmap](#roadmap)).
+
+### How the RAG pipeline works
+
+Deskwise's knowledge base is a complete retrieval-augmented generation loop — an ingestion (write) half and a retrieval-and-generation (read) half — not just a document store bolted onto a chatbot.
+
+**1. Ingestion — turning a document into searchable vectors.** When an admin uploads a policy document (`POST /api/knowledge-docs`), the file is saved and a `KnowledgeDoc` row is created as `processing`, then handed to a pg-boss job so the upload request returns immediately instead of blocking on extraction/embedding. The worker (`jobs/ingest-document-job.ts` → `lib/knowledge-base/ingest-document.ts`) extracts plain text, splits it into overlapping ~1000-character chunks, embeds each chunk with `text-embedding-3-small`, and upserts the vectors into Pinecone (`@langchain/pinecone`'s `PineconeStore`) — each one tagged with its source document and chunk index. The `KnowledgeDoc` row flips to `ready` (or `failed`, with the error saved) once that finishes.
+
+**2. Retrieval + generation — answering a ticket from those vectors.** When a new support ticket arrives (`POST /api/tickets/inbound-email`), it's enqueued onto the `auto-resolve-ticket` job without blocking the webhook response (`jobs/auto-resolve-ticket-job.ts`). That job:
+1. Embeds the ticket's subject + body with the same embedding model and runs a similarity search against Pinecone (`lib/knowledge-base/search-knowledge-base.ts`) to pull back the top-K most relevant chunks across every ingested document — the read-side counterpart to the ingestion pipeline above.
+2. Hands those chunks to an LLM (`lib/tickets/auto-resolve-ticket.ts`) with a strict instruction: answer *only* from the retrieved excerpts, never from outside knowledge, and say so honestly (`canResolve: false`) if they don't fully cover the question. This grounding step is what stops the model from confidently inventing a shipping or refund policy that doesn't exist.
+3. If the model is confident the excerpts fully answer the ticket, it drafts a complete, ready-to-send email — greeting, grounded answer, "Customer Support" sign-off — which is posted as a reply from a synthetic AI Assistant account, and the ticket is marked `resolved`. If not, or if anything in the pipeline fails (empty knowledge base, a Pinecone or OpenAI error), the ticket is simply left `open` for a human, exactly as if auto-resolution had never been attempted.
+
+This read path only ever runs once, at ticket creation — a follow-up email to an already-open ticket reuses that ticket instead of re-triggering resolution.
 
 ## Tech Stack
 
@@ -310,7 +330,7 @@ desky/
 │   ├── server/           # Express 5 API
 │   │   ├── routes/       # tickets, users, knowledge-docs
 │   │   ├── lib/          # tickets/ (AI features), knowledge-base/ (RAG pipeline)
-│   │   ├── jobs/         # pg-boss workers (classify-ticket, ingest-document)
+│   │   ├── jobs/         # pg-boss workers (classify-ticket, auto-resolve-ticket, ingest-document)
 │   │   ├── middleware/   # auth, rate limiting, error handling
 │   │   └── prisma/       # schema, migrations, seed scripts
 │   ├── client/           # React 19 SPA
@@ -328,7 +348,7 @@ desky/
 
 This project was built with [Claude Code](https://claude.com/claude-code), Anthropic's agentic coding CLI, used deliberately as an engineering tool rather than a shortcut — worth stating plainly, since "do you actually know how to work with AI coding tools" is a question that comes up directly in interviews.
 
-To be specific about what that meant in practice: this wasn't vibe coding. Every non-trivial feature went through an explicit **plan-before-code** process — research the existing codebase and its conventions first, design an approach, review it, *then* implement — rather than accepting the first thing generated. Implementations were **verified by actually running the app**, not just by reading the code and trusting it: the RAG ingestion pipeline was tested through real uploads against a real Pinecone index, edge cases like invalid file types, oversized uploads, and non-admin access were exercised directly against a running server, and a real bug in the seed script's idempotency logic was caught — and fixed — by deliberately reproducing a fresh-clone scenario instead of assuming the happy path was the only path. The codebase also went through a dedicated simplification pass afterward to find and remove unnecessary complexity, not just to add features and move on.
+To be specific about what that meant in practice: this wasn't vibe coding. Every non-trivial feature went through an explicit **plan-before-code** process — research the existing codebase and its conventions first, design an approach, review it, *then* implement — rather than accepting the first thing generated. Implementations were **verified by actually running the app**, not just by reading the code and trusting it: the RAG ingestion pipeline was tested through real uploads against a real Pinecone index, automatic ticket resolution was exercised end-to-end against real inbound emails (an answerable question, an unanswerable one, an empty knowledge base, a broken Pinecone config, and a follow-up email to an already-open ticket, each checked against the real database afterward), edge cases like invalid file types, oversized uploads, and non-admin access were exercised directly against a running server, and a real bug in the seed script's idempotency logic was caught — and fixed — by deliberately reproducing a fresh-clone scenario instead of assuming the happy path was the only path. The codebase also went through a dedicated simplification pass afterward to find and remove unnecessary complexity, not just to add features and move on.
 
 The goal wasn't "AI wrote this app" — it's using AI the way a competent engineer uses any powerful tool: with a plan, with verification, and with judgment about what's actually good enough to ship.
 

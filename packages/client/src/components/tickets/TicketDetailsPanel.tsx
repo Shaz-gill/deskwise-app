@@ -1,6 +1,6 @@
 import { useQuery, type UseMutationResult } from '@tanstack/react-query';
 import axios from 'axios';
-import { TicketCategory, TicketStatus } from 'core';
+import { HUMAN_TICKET_STATUSES, TicketCategory } from 'core';
 import { formatCategory } from '../../lib/ticket-format';
 import type { ApiTicketDetail } from '../../pages/TicketDetailPage';
 import { Alert, AlertDescription } from '../ui/alert';
@@ -28,7 +28,7 @@ async function fetchAssignableUsers(): Promise<AssignableUser[]> {
    return data.users;
 }
 
-const statusSelectItems = Object.values(TicketStatus).map((status) => ({
+const statusSelectItems = HUMAN_TICKET_STATUSES.map((status) => ({
    value: status,
    label: status,
 }));
@@ -89,7 +89,7 @@ export function TicketDetailsPanel({
                      <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                     {Object.values(TicketStatus).map((status) => (
+                     {HUMAN_TICKET_STATUSES.map((status) => (
                         <SelectItem
                            key={status}
                            value={status}

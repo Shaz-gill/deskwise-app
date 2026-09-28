@@ -1,9 +1,14 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
-import type { TicketCategory, TicketStatus } from 'core';
+import {
+   TicketReplySenderType,
+   type TicketCategory,
+   type TicketStatus,
+} from 'core';
 import { CalendarPlus, MailIcon, RefreshCw, UserIcon } from 'lucide-react';
 import moment from 'moment';
 import type { ApiTicketDetail } from '../../pages/TicketDetailPage';
+import { Badge } from '../ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { TicketDetailsPanel } from './TicketDetailsPanel';
@@ -32,6 +37,9 @@ async function updateTicket(
 export function TicketDetail({ ticket }: { ticket: ApiTicketDetail }) {
    const queryClient = useQueryClient();
    const ticketId = String(ticket.id);
+   const resolvedByAi = ticket.replies.some(
+      (reply) => reply.senderType === TicketReplySenderType.ai
+   );
 
    const updateMutation = useMutation({
       mutationFn: (payload: TicketUpdatePayload) =>
@@ -49,7 +57,12 @@ export function TicketDetail({ ticket }: { ticket: ApiTicketDetail }) {
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_280px]">
          <Card>
             <CardHeader>
-               <CardTitle className="text-xl">{ticket.subject}</CardTitle>
+               <CardTitle className="flex items-center gap-2 text-xl">
+                  {ticket.subject}
+                  {resolvedByAi && (
+                     <Badge variant="secondary">Resolved by AI</Badge>
+                  )}
+               </CardTitle>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
                <div className="flex items-start justify-between gap-4 text-sm">

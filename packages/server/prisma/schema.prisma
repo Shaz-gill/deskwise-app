@@ -81,6 +81,8 @@ model Verification {
 }
 
 enum TicketStatus {
+  new
+  processing
   open
   resolved
   closed
@@ -113,6 +115,7 @@ model Ticket {
 enum TicketReplySenderType {
   user
   customer
+  ai
 }
 
 model TicketReply {

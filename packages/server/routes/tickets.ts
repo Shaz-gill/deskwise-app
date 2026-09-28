@@ -15,6 +15,7 @@ import { sanitizeHtml } from '../lib/sanitize-html';
 import { summarizeTicket } from '../lib/tickets/summarize-ticket';
 import { parseIntParam, validateBody } from '../lib/validate';
 import { CLASSIFY_TICKET_QUEUE } from '../jobs/classify-ticket-job';
+import { AUTO_RESOLVE_TICKET_QUEUE } from '../jobs/auto-resolve-ticket-job';
 import { requireAuth } from '../middleware/require-auth';
 import {
    inboundEmailLimiter,
@@ -55,8 +56,21 @@ function isSortableField(value: unknown): value is SortableField {
    return SORTABLE_FIELDS.includes(value as SortableField);
 }
 
-function isTicketStatus(value: unknown): value is TicketStatus {
-   return Object.values(TicketStatus).includes(value as TicketStatus);
+// Statuses the ticket list is allowed to show — 'new' and 'processing' are
+// internal-only states owned by the auto-resolve pipeline
+// (jobs/auto-resolve-ticket-job.ts) and must never reach the UI.
+const VISIBLE_TICKET_STATUSES = [
+   TicketStatus.open,
+   TicketStatus.resolved,
+   TicketStatus.closed,
+] as const;
+
+function isVisibleTicketStatus(
+   value: unknown
+): value is (typeof VISIBLE_TICKET_STATUSES)[number] {
+   return (VISIBLE_TICKET_STATUSES as readonly string[]).includes(
+      value as string
+   );
 }
 
 function isTicketCategory(value: unknown): value is TicketCategory {
@@ -93,8 +107,10 @@ ticketsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
    if (typeof subjectParam === 'string' && subjectParam.trim() !== '') {
       where.subject = { contains: subjectParam, mode: 'insensitive' };
    }
-   if (typeof statusParam === 'string' && isTicketStatus(statusParam)) {
+   if (typeof statusParam === 'string' && isVisibleTicketStatus(statusParam)) {
       where.status = statusParam;
+   } else {
+      where.status = { in: [...VISIBLE_TICKET_STATUSES] };
    }
    if (categoryParam === UNCATEGORIZED_FILTER_VALUE) {
       where.category = null;
@@ -356,6 +372,7 @@ ticketsRouter.post(
             bodyHtml: bodyHtml ? sanitizeHtml(bodyHtml) : bodyHtml,
             senderEmail: from,
             senderName: fromName,
+            status: TicketStatus.new,
          },
          select: TICKET_SELECT,
       });
@@ -370,6 +387,23 @@ ticketsRouter.post(
          await boss.send(CLASSIFY_TICKET_QUEUE, { ticketId: ticket.id });
       } catch (err) {
          console.error('Failed to enqueue ticket classification:', err);
+      }
+
+      // Same fire-and-forget contract as classification above: auto-
+      // resolution runs asynchronously in jobs/auto-resolve-ticket-job.ts's
+      // worker. Unlike a failed classify-enqueue (harmless — the ticket
+      // stays visible, just uncategorized), a failed auto-resolve enqueue
+      // would leave the ticket stuck in the internal 'new' status forever,
+      // invisible on the list — so fall back to 'open' so a human still
+      // sees it.
+      try {
+         await boss.send(AUTO_RESOLVE_TICKET_QUEUE, { ticketId: ticket.id });
+      } catch (err) {
+         console.error('Failed to enqueue ticket auto-resolution:', err);
+         await prisma.ticket.updateMany({
+            where: { id: ticket.id, status: TicketStatus.new },
+            data: { status: TicketStatus.open },
+         });
       }
 
       res.status(201).json({ ticket });

@@ -4,8 +4,8 @@
    "type": "module",
    "private": true,
    "scripts": {
-      "start": "bun run index.ts",
-      "dev": "bun --watch run index.ts",
+      "start": "NODE_ENV=development bun run index.ts",
+      "dev": "NODE_ENV=development bun --watch run index.ts",
       "seed": "bun run prisma/scripts/seed.ts",
       "seed:users": "bun run prisma/scripts/seed-users.ts",
       "seed:tickets": "bun run prisma/scripts/seed-tickets.ts",
