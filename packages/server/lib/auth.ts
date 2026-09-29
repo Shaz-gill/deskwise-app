@@ -37,12 +37,21 @@ export const auth = betterAuth({
 
          const existing = await prisma.user.findUnique({
             where: { email },
-            select: { deletedAt: true },
+            select: { deletedAt: true, role: true },
          });
 
          if (existing?.deletedAt) {
             throw new APIError('FORBIDDEN', {
                message: 'This account has been disabled.',
+            });
+         }
+
+         // The AI Assistant (Role.ai) never has a credential Account row,
+         // so it can't complete a real sign-in anyway — this makes that
+         // explicit and permanent rather than relying on that incidentally.
+         if (existing?.role === Role.ai) {
+            throw new APIError('FORBIDDEN', {
+               message: 'This account cannot sign in.',
             });
          }
       }),

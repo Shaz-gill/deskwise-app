@@ -145,6 +145,65 @@ flowchart TB
 - **Soft delete over hard delete.** Deleting a user never removes the row — it sets `deletedAt`, revokes every session, and frees the email address for reuse by overwriting it, so ticket history stays intact for anyone who worked a ticket in the past.
 - **Local file storage today, object storage next.** Uploaded knowledge-base documents currently live on local disk (gitignored) — the deliberate, simplest option for the current stage. Migrating to S3 is planned once the app moves onto AWS infrastructure (see [Roadmap](#roadmap)).
 
+### Auto-resolution, in plain English
+
+Think of it like a mailroom with a small robot helper. Every new ticket gets a secret, invisible stamp — `NEW` — until the robot picks it up and stamps it `PROCESSING` while it thinks. Nobody sees a ticket while it wears either stamp. The robot searches the team's own rulebook (the knowledge base) for pages about the question. If it finds a clear, complete answer, it writes a reply, signs it "Customer Support," and stamps the ticket `RESOLVED` — done, no human needed. If it can't find a good answer, or anything goes wrong, it just stamps the ticket `OPEN` and hands it to a human agent, exactly as if it had never tried.
+
+```
+        email arrives
+              |
+              v
+             NEW   -------- hidden from agents
+              |
+              v
+         PROCESSING -------- still hidden, robot is thinking
+              |
+              v
+      search the knowledge base
+              |
+     +------------------+
+     |                  |
+     v                  v
+found an answer    couldn't find one
+     |                  |
+     v                  v
+ RESOLVED              OPEN
+(AI wrote a reply)  (needs a human)
+     |                  |
+     +--- visible to agents now ---+
+```
+
+### Ticket classification, in plain English
+
+At the very same moment, a second, completely separate little robot reads that same new ticket to figure out what *kind* of question it is. It doesn't wait for the first robot and doesn't block anything — they both just quietly work on the ticket in the background. If a human agent already picked a category by hand before this robot finishes, the robot's guess is thrown away instead of overwriting the human's choice.
+
+```
+        email arrives
+              |
+              v
+     category: none  -------- shown as "Uncategorized"
+              |
+              v
+   robot reads the subject + message
+              |
+              v
+        robot picks ONE:
+      - General Question
+      - Technical Question
+      - Refund Request
+              |
+              v
+   did a human already pick one?
+              |
+       +------+------+
+       |             |
+      yes            no
+       |             |
+       v             v
+  keep the        save the
+ human's pick    robot's label
+```
+
 ### How the RAG pipeline works
 
 Deskwise's knowledge base is a complete retrieval-augmented generation loop — an ingestion (write) half and a retrieval-and-generation (read) half — not just a document store bolted onto a chatbot.

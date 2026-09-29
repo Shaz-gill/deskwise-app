@@ -5,7 +5,7 @@ import {
    TicketReplySenderType,
    TicketStatus,
 } from '../generated/prisma/enums';
-import { getOrCreateAiAssistantUser } from '../lib/tickets/ai-assistant-user';
+import { getAiAssistantUser } from '../lib/tickets/ai-assistant-user';
 import { autoResolveTicket } from '../lib/tickets/auto-resolve-ticket';
 import { searchKnowledgeBase } from '../lib/knowledge-base/search-knowledge-base';
 import { boss } from '../lib/queue';
@@ -87,7 +87,7 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                     });
 
             if (canResolve && reply) {
-               const aiUser = await getOrCreateAiAssistantUser();
+               const aiUser = await getAiAssistantUser();
 
                await prisma.$transaction(async (tx) => {
                   // Guarded processing -> resolved transition: if an agent

@@ -33,7 +33,7 @@ export function UserRowActions({ user }: { user: ApiUser }) {
                </DropdownMenuItem>
                <DropdownMenuItem
                   variant="destructive"
-                  disabled={user.role === Role.admin}
+                  disabled={user.role === Role.admin || user.role === Role.ai}
                   onClick={() => setDeleteOpen(true)}
                >
                   Delete

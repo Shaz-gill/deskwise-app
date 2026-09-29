@@ -206,6 +206,13 @@ usersRouter.delete(
          return;
       }
 
+      if (target.role === Role.ai) {
+         res.status(403).json({
+            error: 'The AI Assistant account cannot be deleted',
+         });
+         return;
+      }
+
       await prisma.$transaction([
          prisma.user.update({
             where: { id: userId },

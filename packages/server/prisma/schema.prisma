@@ -15,6 +15,7 @@ datasource db {
 enum Role {
   admin
   user
+  ai
 }
 
 model User {
@@ -99,7 +100,7 @@ model Ticket {
   subject      String
   body         String
   bodyHtml     String?
-  status       TicketStatus    @default(open)
+  status       TicketStatus    @default(new)
   category     TicketCategory?
   senderName   String
   senderEmail  String
