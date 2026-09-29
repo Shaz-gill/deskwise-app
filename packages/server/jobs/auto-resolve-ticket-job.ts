@@ -45,13 +45,17 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
          // this job runs — nothing to do.
          if (!ticket || ticket.status !== TicketStatus.new) return;
 
+         const aiUser = await getAiAssistantUser();
+
          // Guarded new -> processing transition: if this races with
          // something else (shouldn't happen in practice, since a ticket
          // only ever gets one auto-resolve job), count === 0 and we back
-         // off rather than double-processing.
+         // off rather than double-processing. Also assigns the ticket to
+         // AI Assistant so it reads as "owned" while being worked; handed
+         // back to null (unassigned) below on any fallback-to-open path.
          const { count: claimed } = await prisma.ticket.updateMany({
             where: { id: ticketId, status: TicketStatus.new },
-            data: { status: TicketStatus.processing },
+            data: { status: TicketStatus.processing, assignedToId: aiUser.id },
          });
          if (claimed === 0) return;
 
@@ -87,8 +91,6 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                     });
 
             if (canResolve && reply) {
-               const aiUser = await getAiAssistantUser();
-
                await prisma.$transaction(async (tx) => {
                   // Guarded processing -> resolved transition: if an agent
                   // already moved the ticket while this job was in flight,
@@ -112,7 +114,7 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
             } else {
                await prisma.ticket.updateMany({
                   where: { id: ticketId, status: TicketStatus.processing },
-                  data: { status: TicketStatus.open },
+                  data: { status: TicketStatus.open, assignedToId: null },
                });
             }
          } catch (err) {
@@ -122,7 +124,7 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
             );
             await prisma.ticket.updateMany({
                where: { id: ticketId, status: TicketStatus.processing },
-               data: { status: TicketStatus.open },
+               data: { status: TicketStatus.open, assignedToId: null },
             });
          }
       }

@@ -67,7 +67,7 @@ export function NavBar() {
             )}
          >
             <div className="flex items-center gap-6">
-               <Link to="/">
+               <Link to="/dashboard">
                   <Logo size="sm" />
                </Link>
                <div className="hidden items-center gap-6 md:flex">

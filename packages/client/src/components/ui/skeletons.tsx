@@ -39,6 +39,36 @@ export function TableSkeleton({
    );
 }
 
+export function DashboardStatsSkeleton() {
+   return (
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+         {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="h-full justify-center">
+               <CardHeader>
+                  <Skeleton className="h-4 w-24 bg-muted-foreground/20" />
+               </CardHeader>
+               <CardContent>
+                  <Skeleton className="h-12 w-20 bg-muted-foreground/20" />
+               </CardContent>
+            </Card>
+         ))}
+      </div>
+   );
+}
+
+export function DailyTicketsChartSkeleton() {
+   return (
+      <Card>
+         <CardHeader>
+            <Skeleton className="h-5 w-32 bg-muted-foreground/20" />
+         </CardHeader>
+         <CardContent>
+            <Skeleton className="h-80 w-full bg-muted-foreground/20" />
+         </CardContent>
+      </Card>
+   );
+}
+
 export function TicketDetailSkeleton() {
    return (
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_280px]">

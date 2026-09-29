@@ -32,6 +32,7 @@ usersRouter.get(
 
       const where = {
          deletedAt: null,
+         role: { not: Role.ai },
          ...(search && {
             email: { contains: search, mode: 'insensitive' as const },
          }),

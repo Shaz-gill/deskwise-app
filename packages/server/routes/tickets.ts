@@ -8,7 +8,11 @@ import {
 } from 'core';
 import prisma from '../db';
 import { Prisma } from '../generated/prisma/client';
-import { TicketCategory, TicketStatus } from '../generated/prisma/enums';
+import {
+   TicketCategory,
+   TicketStatus,
+   TicketReplySenderType,
+} from '../generated/prisma/enums';
 import { boss } from '../lib/queue';
 import { polishReply } from '../lib/tickets/polish-reply';
 import { sanitizeHtml } from '../lib/sanitize-html';
@@ -147,6 +151,87 @@ ticketsRouter.get('/', requireAuth, async (req: Request, res: Response) => {
 
    res.json({ tickets, total });
 });
+
+// Number of days (including today) the /stats route's daily ticket-count
+// breakdown covers. The raw SQL below hardcodes '29 days' — the window
+// start — since it must stay in lockstep with this constant.
+const DAILY_TICKET_COUNT_DAYS = 30;
+
+type DailyTicketCountRow = { day: Date; count: number };
+
+function buildDailyTicketCounts(
+   rows: DailyTicketCountRow[]
+): { date: string; count: number }[] {
+   const countsByDate = new Map(
+      rows.map((row) => [row.day.toISOString().slice(0, 10), row.count])
+   );
+
+   const oneDayMs = 24 * 60 * 60 * 1000;
+   const startOfTodayUtc = Math.floor(Date.now() / oneDayMs) * oneDayMs;
+
+   return Array.from({ length: DAILY_TICKET_COUNT_DAYS }, (_, i) => {
+      const offset = DAILY_TICKET_COUNT_DAYS - 1 - i;
+      const date = new Date(startOfTodayUtc - offset * oneDayMs)
+         .toISOString()
+         .slice(0, 10);
+      return { date, count: countsByDate.get(date) ?? 0 };
+   });
+}
+
+// ------------------------------------------------------------------------
+// GET /api/tickets/stats (requireAuth)
+// Org-wide dashboard summary. Avg resolution time is intentionally omitted —
+// Ticket has no resolvedAt timestamp yet (updatedAt is bumped by unrelated
+// edits too); add it once a resolvedAt column exists via migration.
+
+ticketsRouter.get(
+   '/stats',
+   requireAuth,
+   async (req: Request, res: Response) => {
+      const [
+         totalTickets,
+         openTickets,
+         resolvedOrClosedCount,
+         aiResolvedCount,
+         dailyCountRows,
+      ] = await prisma.$transaction([
+         prisma.ticket.count(),
+         prisma.ticket.count({ where: { status: TicketStatus.open } }),
+         prisma.ticket.count({
+            where: {
+               status: { in: [TicketStatus.resolved, TicketStatus.closed] },
+            },
+         }),
+         prisma.ticket.count({
+            where: {
+               status: { in: [TicketStatus.resolved, TicketStatus.closed] },
+               replies: { some: { senderType: TicketReplySenderType.ai } },
+            },
+         }),
+         prisma.$queryRaw<DailyTicketCountRow[]>`
+            SELECT date_trunc('day', "createdAt")::date AS day,
+                   COUNT(*)::int AS count
+            FROM "ticket"
+            WHERE "createdAt" >= date_trunc('day', now()) - interval '29 days'
+            GROUP BY day
+            ORDER BY day
+         `,
+      ]);
+
+      const aiResolvedPercentage =
+         resolvedOrClosedCount === 0
+            ? 0
+            : (aiResolvedCount / resolvedOrClosedCount) * 100;
+
+      res.json({
+         totalTickets,
+         openTickets,
+         dailyTicketCounts: buildDailyTicketCounts(dailyCountRows),
+         aiResolvedCount,
+         aiResolvedPercentage,
+      });
+   }
+);
 
 // ------------------------------------------------------------------------
 // GET /api/tickets/:id (requireAuth)

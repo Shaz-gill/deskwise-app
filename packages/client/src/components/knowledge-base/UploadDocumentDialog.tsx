@@ -2,8 +2,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { type FormEvent, useState } from 'react';
 import type { ApiKnowledgeDoc } from './KnowledgeDocsList';
+import { cn } from '../../lib/utils';
 import { Alert, AlertDescription } from '../ui/alert';
-import { Button } from '../ui/button';
+import { Button, buttonVariants } from '../ui/button';
 import {
    Dialog,
    DialogClose,
@@ -14,7 +15,6 @@ import {
    DialogTitle,
    DialogTrigger,
 } from '../ui/dialog';
-import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 
 async function uploadDocument(file: File): Promise<ApiKnowledgeDoc> {
@@ -80,10 +80,25 @@ export function UploadDocumentDialog() {
 
                <div className="flex flex-col gap-1.5">
                   <Label htmlFor="upload-document-file">File</Label>
-                  <Input
+                  <div className="flex items-center gap-3">
+                     <label
+                        htmlFor="upload-document-file"
+                        className={cn(
+                           buttonVariants({ variant: 'outline', size: 'sm' }),
+                           'cursor-pointer'
+                        )}
+                     >
+                        Choose file
+                     </label>
+                     <span className="truncate text-sm text-muted-foreground">
+                        {file ? file.name : 'No file chosen'}
+                     </span>
+                  </div>
+                  <input
                      id="upload-document-file"
                      type="file"
                      accept=".pdf,.docx,.txt,.md"
+                     className="sr-only"
                      onChange={(event) =>
                         setFile(event.target.files?.[0] ?? null)
                      }

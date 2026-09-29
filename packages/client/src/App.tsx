@@ -1,10 +1,9 @@
-import { Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { AdminRoute } from './components/routes/AdminRoute';
 import { GuestRoute } from './components/routes/GuestRoute';
 import { ProtectedRoute } from './components/routes/ProtectedRoute';
 import { DashboardPage } from './pages/DashboardPage';
-import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { TicketDetailPage } from './pages/TicketDetailPage';
@@ -22,16 +21,7 @@ function App() {
                </GuestRoute>
             }
          />
-         <Route
-            path="/"
-            element={
-               <ProtectedRoute>
-                  <Layout>
-                     <HomePage />
-                  </Layout>
-               </ProtectedRoute>
-            }
-         />
+         <Route path="/" element={<Navigate to="/dashboard" replace />} />
          <Route
             path="/dashboard"
             element={
