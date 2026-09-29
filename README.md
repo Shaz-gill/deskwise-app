@@ -42,30 +42,30 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 
 ## Screenshots
 
-<!-- Add a screenshot at docs/screenshots/tickets-list.png -->
+<!-- Add a screenshot at screenshots/tickets-list.png -->
 ### Tickets List
 
-![Tickets List](docs/screenshots/tickets-list.png)
+![Tickets List](screenshots/tickets-list.png)
 
-<!-- Add a screenshot at docs/screenshots/ticket-detail.png -->
+<!-- Add a screenshot at screenshots/ticket-detail.png -->
 ### Ticket Detail — AI Summary & Reply Polish
 
-![Ticket Detail](docs/screenshots/ticket-detail.png)
+![Ticket Detail](screenshots/ticket-detail.png)
 
-<!-- Add a screenshot at docs/screenshots/knowledge-base.png -->
+<!-- Add a screenshot at screenshots/knowledge-base.png -->
 ### Knowledge Base (RAG document management)
 
-![Knowledge Base](docs/screenshots/knowledge-base.png)
+![Knowledge Base](screenshots/knowledge-base.png)
 
-<!-- Add a screenshot at docs/screenshots/user-management.png -->
+<!-- Add a screenshot at screenshots/user-management.png -->
 ### User Management
 
-![User Management](docs/screenshots/user-management.png)
+![User Management](screenshots/user-management.png)
 
-<!-- Add a screenshot at docs/screenshots/login.png -->
+<!-- Add a screenshot at screenshots/login.png -->
 ### Login
 
-![Login](docs/screenshots/login.png)
+![Login](screenshots/login.png)
 
 ## Features
 
@@ -398,7 +398,6 @@ desky/
 │   │       ├── components/   # tickets/, users/, knowledge-base/, ui/ (shadcn)
 │   │       └── hooks/
 │   └── core/             # shared Zod schemas + const-object enums
-└── docs/                 # product scope, tech stack, implementation plan
 ```
 
 ## Development Process
@@ -413,8 +412,9 @@ The goal wasn't "AI wrote this app" — it's using AI the way a competent engine
 
 ## Roadmap
 
-- 📊 Dashboard with real ticket analytics (currently a placeholder page)
+- ✍️ Agent-facing suggested-reply drafting (an AI-written first draft for a human to review, as opposed to polishing an agent's own draft or full auto-resolution)
 - 📤 Outbound email sending (currently inbound-only via webhook)
+- 📧 Real email-provider ingestion (SendGrid/Mailgun — currently a generic secret-gated JSON webhook)
 - 🐳 Docker + cloud deployment configuration
 - ☁️ Migrate knowledge-base file storage from local disk to AWS S3 once the app moves onto AWS infrastructure
 

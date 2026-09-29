@@ -1,6 +1,7 @@
+// Zod schemas shared by server and client, one per form/payload.
+
 import { z } from 'zod';
-import { TicketCategory } from './ticket-category';
-import { HUMAN_TICKET_STATUSES } from './ticket-status';
+import { TicketCategory, HUMAN_TICKET_STATUSES } from './enums';
 
 export const loginSchema = z.object({
    email: z.string().min(1, 'Email is required').email('Enter a valid email'),
