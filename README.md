@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎫 Deskwise
+# Deskwise
 
 ### AI-Powered Support Ticket Management System
 
@@ -69,12 +69,14 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 ## Features
 
 **Ticket Management**
+
 - Paginated, sortable, filterable ticket list (by subject, status, category)
 - Ticket detail view with a threaded reply history
 - Assignment to agents, status transitions (Open → Resolved → Closed)
 - Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
+
 - 🤖 **Automatic resolution via RAG** — every new ticket is checked against the knowledge base the instant it arrives; if the retrieved excerpts fully and confidently answer it, a complete, ready-to-send email reply is generated and posted automatically (signed off "Customer Support") and the ticket is marked resolved — without ever landing in an agent's queue. Anything the knowledge base can't answer is left untouched and open for a human — see [How the RAG pipeline works](#how-the-rag-pipeline-works)
 - 🏷️ **Auto-classification** — every inbound ticket is classified (general question / technical question / refund request) asynchronously, without blocking the webhook response
 - 📝 **AI summaries** — one click to summarize a long ticket + reply thread for an agent picking it up cold
@@ -82,6 +84,7 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 - 📚 **Retrieval-augmented knowledge base** — admins upload PDF/DOCX/TXT/MD policy docs; they're chunked, embedded, and stored in Pinecone, powering the automatic resolution above instead of the model hallucinating an answer
 
 **User Management & Auth**
+
 - Session-based authentication (no public sign-up — admin-provisioned accounts only)
 - Admin/Agent roles with route- and API-level authorization
 - Soft-delete with session revocation, not destructive hard deletes
@@ -174,7 +177,7 @@ found an answer    couldn't find one
 
 ### Ticket classification, in plain English
 
-At the very same moment, a second, completely separate little robot reads that same new ticket to figure out what *kind* of question it is. It doesn't wait for the first robot and doesn't block anything — they both just quietly work on the ticket in the background. If a human agent already picked a category by hand before this robot finishes, the robot's guess is thrown away instead of overwriting the human's choice.
+At the very same moment, a second, completely separate little robot reads that same new ticket to figure out what _kind_ of question it is. It doesn't wait for the first robot and doesn't block anything — they both just quietly work on the ticket in the background. If a human agent already picked a category by hand before this robot finishes, the robot's guess is thrown away instead of overwriting the human's choice.
 
 ```
         email arrives
@@ -210,8 +213,9 @@ Deskwise's knowledge base is a complete retrieval-augmented generation loop — 
 **1. Ingestion — turning a document into searchable vectors.** When an admin uploads a policy document (`POST /api/knowledge-docs`), the file is saved and a `KnowledgeDoc` row is created as `processing`, then handed to a pg-boss job so the upload request returns immediately instead of blocking on extraction/embedding. The worker (`jobs/ingest-document-job.ts` → `lib/knowledge-base/ingest-document.ts`) extracts plain text, splits it into overlapping ~1000-character chunks, embeds each chunk with `text-embedding-3-small`, and upserts the vectors into Pinecone (`@langchain/pinecone`'s `PineconeStore`) — each one tagged with its source document and chunk index. The `KnowledgeDoc` row flips to `ready` (or `failed`, with the error saved) once that finishes.
 
 **2. Retrieval + generation — answering a ticket from those vectors.** When a new support ticket arrives (`POST /api/tickets/inbound-email`), it's enqueued onto the `auto-resolve-ticket` job without blocking the webhook response (`jobs/auto-resolve-ticket-job.ts`). That job:
+
 1. Embeds the ticket's subject + body with the same embedding model and runs a similarity search against Pinecone (`lib/knowledge-base/search-knowledge-base.ts`) to pull back the top-K most relevant chunks across every ingested document — the read-side counterpart to the ingestion pipeline above.
-2. Hands those chunks to an LLM (`lib/tickets/auto-resolve-ticket.ts`) with a strict instruction: answer *only* from the retrieved excerpts, never from outside knowledge, and say so honestly (`canResolve: false`) if they don't fully cover the question. This grounding step is what stops the model from confidently inventing a shipping or refund policy that doesn't exist.
+2. Hands those chunks to an LLM (`lib/tickets/auto-resolve-ticket.ts`) with a strict instruction: answer _only_ from the retrieved excerpts, never from outside knowledge, and say so honestly (`canResolve: false`) if they don't fully cover the question. This grounding step is what stops the model from confidently inventing a shipping or refund policy that doesn't exist.
 3. If the model is confident the excerpts fully answer the ticket, it drafts a complete, ready-to-send email — greeting, grounded answer, "Customer Support" sign-off — which is posted as a reply from a synthetic AI Assistant account, and the ticket is marked `resolved`. If not, or if anything in the pipeline fails (empty knowledge base, a Pinecone or OpenAI error), the ticket is simply left `open` for a human, exactly as if auto-resolution had never been attempted.
 
 This read path only ever runs once, at ticket creation — a follow-up email to an already-open ticket reuses that ticket instead of re-triggering resolution.
@@ -281,45 +285,53 @@ Bun workspaces monorepo (`packages/server`, `packages/client`, `packages/core`) 
 This section documents the actual mechanisms in the codebase, not a generic checklist.
 
 **Authentication & Sessions**
+
 - [Better Auth](https://www.better-auth.com) with `disableSignUp: true` — there is no public registration; every account is admin-provisioned, matching an admin-creates-agents model
 - Passwords are hashed via Better Auth's own `hashPassword` — the app never rolls its own hashing
 - A sign-in hook blocks any soft-deleted user with a `FORBIDDEN` error, even if their old session token still exists somewhere
 - `requireAuth` middleware validates every protected request's session before any route handler runs
 
 **Authorization**
-- `requireAdmin` middleware gates admin-only routes (user management, knowledge-base management) — always composed *after* `requireAuth`
+
+- `requireAdmin` middleware gates admin-only routes (user management, knowledge-base management) — always composed _after_ `requireAuth`
 - Role checks compare against shared const-object enums (`Role.admin`) from `packages/core`, never raw string literals, on both client and server
 
 **Rate Limiting** — every limiter below uses a 15-minute sliding window (`express-rate-limit`, RFC draft-8 headers):
 
-| Limiter | Limit | Protects |
-|---|---|---|
-| `authLimiter` | 20 / 15 min | Credential (sign-in) paths |
-| `inboundEmailLimiter` | 50 / 15 min | Inbound-email webhook |
-| `polishLimiter` | 20 / 15 min | AI reply-polish endpoint |
-| `summarizeLimiter` | 20 / 15 min | AI ticket-summarize endpoint |
+| Limiter                  | Limit       | Protects                       |
+| ------------------------ | ----------- | ------------------------------ |
+| `authLimiter`            | 20 / 15 min | Credential (sign-in) paths     |
+| `inboundEmailLimiter`    | 50 / 15 min | Inbound-email webhook          |
+| `polishLimiter`          | 20 / 15 min | AI reply-polish endpoint       |
+| `summarizeLimiter`       | 20 / 15 min | AI ticket-summarize endpoint   |
 | `knowledgeUploadLimiter` | 10 / 15 min | Knowledge-base document upload |
 
 **Input Validation & Sanitization**
+
 - Every mutating request body is validated against a shared Zod schema (`packages/core`) before touching the database
 - All stored rich-text HTML (`bodyHtml` on tickets and replies) is run through DOMPurify against a server-side jsdom window before persisting — mitigates stored XSS from customer email HTML or agent rich-text replies
 
 **File Upload Safety**
+
 - Knowledge-base uploads are restricted to an explicit extension allowlist (`.pdf`, `.docx`, `.txt`, `.md`) checked against the filename itself — not the browser-supplied Content-Type, which is spoofable and, for `.md` specifically, often missing or inconsistent
 - 20MB size limit enforced server-side
 - Stored filenames are UUID-prefixed to eliminate collisions and prevent any path-traversal risk from a user-supplied original filename
 
 **Webhook Security**
+
 - The inbound-email webhook requires an `x-webhook-secret` header, compared against the configured secret using `crypto.timingSafeEqual` — a constant-time comparison that avoids leaking the correct secret one byte at a time via response-timing side channels
 
 **Network & Transport**
+
 - `helmet()` applies standard secure HTTP headers on every response
 - CORS is an explicit allowlist (`TRUSTED_ORIGINS`), not a wildcard — the same allowlist is shared with Better Auth's own origin check, since Better Auth validates the request origin independently of Express's CORS layer
 
 **Error Handling**
+
 - A single centralized error handler maps known Prisma errors to the right HTTP status (unique-constraint → 409, not-found → 404) and returns a generic message for everything else — internal error details and stack traces are never leaked to the client
 
 **Data Handling**
+
 - User deletion is a soft delete: the row is never removed, all sessions are revoked immediately, and the email is overwritten so it can be reused — while admin accounts are explicitly protected from deletion entirely
 - The Pinecone index is never auto-created or resized — a missing or mismatched index fails the upload loudly with a clear stored error rather than silently provisioning cloud infrastructure
 
@@ -328,9 +340,9 @@ This section documents the actual mechanisms in the codebase, not a generic chec
 **Prerequisites:**
 
 - [Bun](https://bun.sh) — install with:
-  ```bash
-  curl -fsSL https://bun.sh/install | bash
-  ```
+   ```bash
+   curl -fsSL https://bun.sh/install | bash
+   ```
 - A PostgreSQL database (a free hosted instance works fine — see the tip in `packages/server/prisma/schema.prisma`)
 - An OpenAI API key
 - A Pinecone account with an index already created
@@ -346,19 +358,19 @@ cp packages/server/.env.example packages/server/.env
 # then fill in every value below
 ```
 
-| Variable | Purpose |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string |
-| `BETTER_AUTH_SECRET` | Signs/encrypts sessions and tokens |
-| `BETTER_AUTH_URL` | Base server URL, used for auth callbacks |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial admin account, used by `bun run seed` |
-| `TRUSTED_ORIGINS` | Comma-separated allowed CORS origins |
-| `WEBHOOK_SECRET` | Shared secret for the inbound-email webhook |
-| `OPENAI_API_KEY` | Powers classification, summarize, polish, and embeddings |
-| `OPENAI_MODEL` | Optional, defaults to `gpt-5-nano` |
-| `OPENAI_EMBEDDING_MODEL` | Optional, defaults to `text-embedding-3-small` (1536 dimensions) |
-| `PINECONE_API_KEY` | Pinecone API key |
-| `PINECONE_INDEX_NAME` | Name of an **existing** Pinecone index with a matching dimension — this app never creates one for you |
+| Variable                         | Purpose                                                                                               |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------- |
+| `DATABASE_URL`                   | PostgreSQL connection string                                                                          |
+| `BETTER_AUTH_SECRET`             | Signs/encrypts sessions and tokens                                                                    |
+| `BETTER_AUTH_URL`                | Base server URL, used for auth callbacks                                                              |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial admin account, used by `bun run seed`                                                         |
+| `TRUSTED_ORIGINS`                | Comma-separated allowed CORS origins                                                                  |
+| `WEBHOOK_SECRET`                 | Shared secret for the inbound-email webhook                                                           |
+| `OPENAI_API_KEY`                 | Powers classification, summarize, polish, and embeddings                                              |
+| `OPENAI_MODEL`                   | Optional, defaults to `gpt-5-nano`                                                                    |
+| `OPENAI_EMBEDDING_MODEL`         | Optional, defaults to `text-embedding-3-small` (1536 dimensions)                                      |
+| `PINECONE_API_KEY`               | Pinecone API key                                                                                      |
+| `PINECONE_INDEX_NAME`            | Name of an **existing** Pinecone index with a matching dimension — this app never creates one for you |
 
 ```bash
 # 3. Set up the database (run these yourself — they need an interactive terminal)
@@ -406,7 +418,7 @@ desky/
 
 This project was built with [Claude Code](https://claude.com/claude-code), Anthropic's agentic coding CLI, used deliberately as an engineering tool rather than a shortcut — worth stating plainly, since "do you actually know how to work with AI coding tools" is a question that comes up directly in interviews.
 
-To be specific about what that meant in practice: this wasn't vibe coding. Every non-trivial feature went through an explicit **plan-before-code** process — research the existing codebase and its conventions first, design an approach, review it, *then* implement — rather than accepting the first thing generated. Implementations were **verified by actually running the app**, not just by reading the code and trusting it: the RAG ingestion pipeline was tested through real uploads against a real Pinecone index, automatic ticket resolution was exercised end-to-end against real inbound emails (an answerable question, an unanswerable one, an empty knowledge base, a broken Pinecone config, and a follow-up email to an already-open ticket, each checked against the real database afterward), edge cases like invalid file types, oversized uploads, and non-admin access were exercised directly against a running server, and a real bug in the seed script's idempotency logic was caught — and fixed — by deliberately reproducing a fresh-clone scenario instead of assuming the happy path was the only path. The codebase also went through a dedicated simplification pass afterward to find and remove unnecessary complexity, not just to add features and move on.
+To be specific about what that meant in practice: this wasn't vibe coding. Every non-trivial feature went through an explicit **plan-before-code** process — research the existing codebase and its conventions first, design an approach, review it, _then_ implement — rather than accepting the first thing generated. Implementations were **verified by actually running the app**, not just by reading the code and trusting it: the RAG ingestion pipeline was tested through real uploads against a real Pinecone index, automatic ticket resolution was exercised end-to-end against real inbound emails (an answerable question, an unanswerable one, an empty knowledge base, a broken Pinecone config, and a follow-up email to an already-open ticket, each checked against the real database afterward), edge cases like invalid file types, oversized uploads, and non-admin access were exercised directly against a running server, and a real bug in the seed script's idempotency logic was caught — and fixed — by deliberately reproducing a fresh-clone scenario instead of assuming the happy path was the only path. The codebase also went through a dedicated simplification pass afterward to find and remove unnecessary complexity, not just to add features and move on.
 
 The goal wasn't "AI wrote this app" — it's using AI the way a competent engineer uses any powerful tool: with a plan, with verification, and with judgment about what's actually good enough to ship.
 
