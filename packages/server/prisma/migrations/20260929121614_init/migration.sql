@@ -1,14 +1,17 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('admin', 'user');
+CREATE TYPE "Role" AS ENUM ('admin', 'user', 'ai');
 
 -- CreateEnum
-CREATE TYPE "TicketStatus" AS ENUM ('open', 'resolved', 'closed');
+CREATE TYPE "TicketStatus" AS ENUM ('new', 'processing', 'open', 'resolved', 'closed');
 
 -- CreateEnum
 CREATE TYPE "TicketCategory" AS ENUM ('general_question', 'technical_question', 'refund_request');
 
 -- CreateEnum
-CREATE TYPE "TicketReplySenderType" AS ENUM ('user', 'customer');
+CREATE TYPE "TicketReplySenderType" AS ENUM ('user', 'customer', 'ai');
+
+-- CreateEnum
+CREATE TYPE "KnowledgeDocStatus" AS ENUM ('processing', 'ready', 'failed');
 
 -- CreateTable
 CREATE TABLE "user" (
@@ -76,7 +79,7 @@ CREATE TABLE "ticket" (
     "subject" TEXT NOT NULL,
     "body" TEXT NOT NULL,
     "bodyHtml" TEXT,
-    "status" "TicketStatus" NOT NULL DEFAULT 'open',
+    "status" "TicketStatus" NOT NULL DEFAULT 'new',
     "category" "TicketCategory",
     "senderName" TEXT NOT NULL,
     "senderEmail" TEXT NOT NULL,
@@ -100,6 +103,21 @@ CREATE TABLE "ticket_reply" (
     CONSTRAINT "ticket_reply_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "knowledge_doc" (
+    "id" SERIAL NOT NULL,
+    "filename" TEXT NOT NULL,
+    "path" TEXT NOT NULL,
+    "status" "KnowledgeDocStatus" NOT NULL DEFAULT 'processing',
+    "chunkCount" INTEGER NOT NULL DEFAULT 0,
+    "error" TEXT,
+    "uploadedById" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "knowledge_doc_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
 
@@ -120,3 +138,6 @@ ALTER TABLE "ticket_reply" ADD CONSTRAINT "ticket_reply_ticketId_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "ticket_reply" ADD CONSTRAINT "ticket_reply_authorId_fkey" FOREIGN KEY ("authorId") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "knowledge_doc" ADD CONSTRAINT "knowledge_doc_uploadedById_fkey" FOREIGN KEY ("uploadedById") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
