@@ -42,30 +42,29 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 
 ## Screenshots
 
-<!-- Add a screenshot at screenshots/tickets-list.png -->
+### Login
+
+![Login](screenshots/login.png)
+
+### Dashboard
+
+![Dashboard](screenshots/dashboard.png)
+
 ### Tickets List
 
-![Tickets List](screenshots/tickets-list.png)
+![Tickets List](screenshots/tickets.png)
 
-<!-- Add a screenshot at screenshots/ticket-detail.png -->
-### Ticket Detail — AI Summary & Reply Polish
+### Ticket Detail — Resolved by AI
 
 ![Ticket Detail](screenshots/ticket-detail.png)
 
-<!-- Add a screenshot at screenshots/knowledge-base.png -->
 ### Knowledge Base (RAG document management)
 
 ![Knowledge Base](screenshots/knowledge-base.png)
 
-<!-- Add a screenshot at screenshots/user-management.png -->
 ### User Management
 
-![User Management](screenshots/user-management.png)
-
-<!-- Add a screenshot at screenshots/login.png -->
-### Login
-
-![Login](screenshots/login.png)
+![User Management](screenshots/users.png)
 
 ## Features
 
@@ -398,6 +397,7 @@ desky/
 │   │       ├── components/   # tickets/, users/, knowledge-base/, ui/ (shadcn)
 │   │       └── hooks/
 │   └── core/             # shared Zod schemas + const-object enums
+└── screenshots/           # README screenshots
 ```
 
 ## Development Process
