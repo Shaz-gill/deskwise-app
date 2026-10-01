@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "Role" AS ENUM ('admin', 'user', 'ai');
+CREATE TYPE "Role" AS ENUM ('admin', 'user', 'ai', 'customer');
 
 -- CreateEnum
 CREATE TYPE "TicketStatus" AS ENUM ('new', 'processing', 'open', 'resolved', 'closed');
