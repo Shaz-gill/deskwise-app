@@ -63,7 +63,7 @@ export function CreateUserDialog() {
 
    return (
       <UserFormDialog
-         trigger={<Button>Create User</Button>}
+         trigger={<Button size="lg">Create User</Button>}
          title="Create User"
          description="Add a new user account. They'll be able to sign in immediately with the email and password you set here."
          open={open}

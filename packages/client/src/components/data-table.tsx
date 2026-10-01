@@ -195,7 +195,7 @@ export function DataTable<TData, TValue>({
                      <DropdownMenu key={columnId}>
                         <DropdownMenuTrigger
                            render={
-                              <Button variant="outline">
+                              <Button variant="outline" size="lg">
                                  {selectedLabel
                                     ? `${title}: ${selectedLabel}`
                                     : title}
@@ -231,7 +231,11 @@ export function DataTable<TData, TValue>({
             <div className="flex items-center gap-2">
                <DropdownMenu>
                   <DropdownMenuTrigger
-                     render={<Button variant="outline">Columns</Button>}
+                     render={
+                        <Button variant="outline" size="lg">
+                           Columns
+                        </Button>
+                     }
                   />
                   <DropdownMenuContent align="end">
                      {table

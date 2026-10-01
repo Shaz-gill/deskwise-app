@@ -41,16 +41,12 @@ export function TableSkeleton({
 
 export function DashboardStatsSkeleton() {
    return (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-2 divide-x divide-y divide-border overflow-hidden rounded-xl bg-card ring-1 ring-foreground/10 lg:grid-cols-4 lg:divide-y-0">
          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="h-full justify-center">
-               <CardHeader>
-                  <Skeleton className="h-4 w-24 bg-muted-foreground/20" />
-               </CardHeader>
-               <CardContent>
-                  <Skeleton className="h-12 w-20 bg-muted-foreground/20" />
-               </CardContent>
-            </Card>
+            <div key={i} className="flex flex-col gap-2 px-4 py-3">
+               <Skeleton className="h-4 w-24 bg-muted-foreground/20" />
+               <Skeleton className="h-9 w-20 bg-muted-foreground/20" />
+            </div>
          ))}
       </div>
    );
@@ -66,6 +62,25 @@ export function DailyTicketsChartSkeleton() {
             <Skeleton className="h-80 w-full bg-muted-foreground/20" />
          </CardContent>
       </Card>
+   );
+}
+
+// Shared by CategoryBreakdown and UserWorkload, which both render a
+// label + bar per row.
+export function DashboardBarListSkeleton({
+   rowCount = 4,
+}: {
+   rowCount?: number;
+}) {
+   return (
+      <div className="flex flex-col gap-3">
+         {Array.from({ length: rowCount }).map((_, i) => (
+            <div key={i} className="flex flex-col gap-1.5">
+               <Skeleton className="h-4 w-32 bg-muted-foreground/20" />
+               <Skeleton className="h-1.5 w-full bg-muted-foreground/20" />
+            </div>
+         ))}
+      </div>
    );
 }
 

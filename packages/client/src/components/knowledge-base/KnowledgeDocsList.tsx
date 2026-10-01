@@ -39,10 +39,10 @@ async function fetchKnowledgeDocs(): Promise<ApiKnowledgeDoc[]> {
 
 const STATUS_BADGE_VARIANT: Record<
    KnowledgeDocStatus,
-   'secondary' | 'default' | 'destructive'
+   'secondary' | 'success' | 'destructive'
 > = {
    [KnowledgeDocStatus.Processing]: 'secondary',
-   [KnowledgeDocStatus.Ready]: 'default',
+   [KnowledgeDocStatus.Ready]: 'success',
    [KnowledgeDocStatus.Failed]: 'destructive',
 };
 

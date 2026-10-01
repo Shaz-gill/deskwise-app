@@ -189,33 +189,48 @@ ticketsRouter.get(
    requireAuth,
    async (req: Request, res: Response) => {
       const [
-         totalTickets,
-         openTickets,
-         resolvedOrClosedCount,
-         aiResolvedCount,
-         dailyCountRows,
-      ] = await prisma.$transaction([
-         prisma.ticket.count(),
-         prisma.ticket.count({ where: { status: TicketStatus.open } }),
-         prisma.ticket.count({
-            where: {
-               status: { in: [TicketStatus.resolved, TicketStatus.closed] },
-            },
+         [
+            totalTickets,
+            openTickets,
+            resolvedOrClosedCount,
+            aiResolvedCount,
+            dailyCountRows,
+         ],
+         categoryGroups,
+         openAssigneeGroups,
+      ] = await Promise.all([
+         prisma.$transaction([
+            prisma.ticket.count(),
+            prisma.ticket.count({ where: { status: TicketStatus.open } }),
+            prisma.ticket.count({
+               where: {
+                  status: { in: [TicketStatus.resolved, TicketStatus.closed] },
+               },
+            }),
+            prisma.ticket.count({
+               where: {
+                  status: { in: [TicketStatus.resolved, TicketStatus.closed] },
+                  replies: { some: { senderType: TicketReplySenderType.ai } },
+               },
+            }),
+            prisma.$queryRaw<DailyTicketCountRow[]>`
+               SELECT date_trunc('day', "createdAt")::date AS day,
+                      COUNT(*)::int AS count
+               FROM "ticket"
+               WHERE "createdAt" >= date_trunc('day', now()) - interval '29 days'
+               GROUP BY day
+               ORDER BY day
+            `,
+         ]),
+         prisma.ticket.groupBy({ by: ['category'], _count: true }),
+         // Open-ticket workload per assignee — groupBy can't join to the
+         // User table directly, so assignee names are resolved below in a
+         // second query against just the ids that came back here.
+         prisma.ticket.groupBy({
+            by: ['assignedToId'],
+            where: { status: TicketStatus.open, assignedToId: { not: null } },
+            _count: true,
          }),
-         prisma.ticket.count({
-            where: {
-               status: { in: [TicketStatus.resolved, TicketStatus.closed] },
-               replies: { some: { senderType: TicketReplySenderType.ai } },
-            },
-         }),
-         prisma.$queryRaw<DailyTicketCountRow[]>`
-            SELECT date_trunc('day', "createdAt")::date AS day,
-                   COUNT(*)::int AS count
-            FROM "ticket"
-            WHERE "createdAt" >= date_trunc('day', now()) - interval '29 days'
-            GROUP BY day
-            ORDER BY day
-         `,
       ]);
 
       const aiResolvedPercentage =
@@ -223,12 +238,44 @@ ticketsRouter.get(
             ? 0
             : (aiResolvedCount / resolvedOrClosedCount) * 100;
 
+      const categoryBreakdown = categoryGroups
+         .map((group) => ({ category: group.category, count: group._count }))
+         .sort((a, b) => b.count - a.count);
+
+      const assigneeIds = openAssigneeGroups
+         .map((group) => group.assignedToId)
+         .filter((id): id is string => id !== null);
+      const assignees =
+         assigneeIds.length > 0
+            ? await prisma.user.findMany({
+                 where: { id: { in: assigneeIds } },
+                 select: { id: true, name: true },
+              })
+            : [];
+      const assigneeNameById = new Map(
+         assignees.map((assignee) => [assignee.id, assignee.name])
+      );
+      // Top 8 by open-ticket count — enough to spot who's overloaded
+      // without the dashboard card needing its own scroll.
+      const USER_WORKLOAD_LIMIT = 8;
+      const userWorkload = openAssigneeGroups
+         .map((group) => ({
+            userId: group.assignedToId as string,
+            userName:
+               assigneeNameById.get(group.assignedToId as string) ?? 'Unknown',
+            openCount: group._count,
+         }))
+         .sort((a, b) => b.openCount - a.openCount)
+         .slice(0, USER_WORKLOAD_LIMIT);
+
       res.json({
          totalTickets,
          openTickets,
          dailyTicketCounts: buildDailyTicketCounts(dailyCountRows),
          aiResolvedCount,
          aiResolvedPercentage,
+         categoryBreakdown,
+         userWorkload,
       });
    }
 );

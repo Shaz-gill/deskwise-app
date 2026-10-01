@@ -104,10 +104,12 @@ const columns: ColumnDef<ApiTicket>[] = [
       header: 'Category',
       cell: ({ row }) => {
          const category = row.getValue<TicketCategory | null>('category');
-         return (
-            <span className="capitalize">
-               {category ? formatCategory(category) : '—'}
-            </span>
+         return category ? (
+            <Badge variant="outline" className="capitalize">
+               {formatCategory(category)}
+            </Badge>
+         ) : (
+            <span className="text-muted-foreground">—</span>
          );
       },
    },

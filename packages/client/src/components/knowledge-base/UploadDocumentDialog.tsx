@@ -63,7 +63,7 @@ export function UploadDocumentDialog() {
 
    return (
       <Dialog open={open} onOpenChange={handleOpenChange}>
-         <DialogTrigger render={<Button>Upload Document</Button>} />
+         <DialogTrigger render={<Button size="lg">Upload Document</Button>} />
          <DialogContent>
             <form
                onSubmit={onSubmit}

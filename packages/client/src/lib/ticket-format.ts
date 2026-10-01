@@ -12,7 +12,7 @@ export function formatCategory(category: TicketCategory): string {
 
 export const STATUS_BADGE_VARIANT: Record<
    TicketStatus,
-   'default' | 'secondary' | 'outline'
+   'warning' | 'success' | 'outline'
 > = {
    // Never actually rendered — 'new'/'processing' tickets never reach the
    // client (see routes/tickets.ts's GET / and the auto-resolve pipeline) —
@@ -20,8 +20,12 @@ export const STATUS_BADGE_VARIANT: Record<
    // exhaustive Record.
    [TicketStatus.New]: 'outline',
    [TicketStatus.Processing]: 'outline',
-   [TicketStatus.Open]: 'default',
-   [TicketStatus.Resolved]: 'secondary',
+   // 'open' means it needs a human's attention — the one state that should
+   // actually pull the eye in a ticket list, so it gets the warm/warning
+   // color rather than sharing the app's primary accent with everything
+   // else (buttons, nav, chart bars).
+   [TicketStatus.Open]: 'warning',
+   [TicketStatus.Resolved]: 'success',
    [TicketStatus.Closed]: 'outline',
 };
 
