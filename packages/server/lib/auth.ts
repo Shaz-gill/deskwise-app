@@ -49,7 +49,9 @@ export const auth = betterAuth({
          // The AI Assistant (Role.ai) never has a credential Account row,
          // so it can't complete a real sign-in anyway — this makes that
          // explicit and permanent rather than relying on that incidentally.
-         if (existing?.role === Role.ai) {
+         // Same story for Role.customer: seeded customer rows (ticket-reply
+         // authors only) never get an Account row either.
+         if (existing?.role === Role.ai || existing?.role === Role.customer) {
             throw new APIError('FORBIDDEN', {
                message: 'This account cannot sign in.',
             });

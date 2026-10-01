@@ -33,6 +33,18 @@ type UsersResponse = {
    pageSize: number;
 };
 
+// One distinct color per role so admin/staff/AI/customer accounts are
+// visually distinguishable at a glance in the Users table.
+const ROLE_BADGE_VARIANT: Record<
+   Role,
+   'default' | 'secondary' | 'outline' | 'warning' | 'success'
+> = {
+   [Role.admin]: 'default',
+   [Role.user]: 'secondary',
+   [Role.ai]: 'success',
+   [Role.customer]: 'warning',
+};
+
 async function fetchUsers(params: {
    page: number;
    pageSize: number;
@@ -65,10 +77,7 @@ const columns: ColumnDef<ApiUser>[] = [
       cell: ({ row }) => {
          const role = row.getValue<Role>('role');
          return (
-            <Badge
-               variant={role === Role.admin ? 'default' : 'secondary'}
-               className="capitalize"
-            >
+            <Badge variant={ROLE_BADGE_VARIANT[role]} className="capitalize">
                {role}
             </Badge>
          );

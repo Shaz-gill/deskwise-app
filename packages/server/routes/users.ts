@@ -32,7 +32,10 @@ usersRouter.get(
 
       const where = {
          deletedAt: null,
-         role: { not: Role.ai },
+         // Staff-only listing — the AI Assistant bot account and seeded
+         // customer accounts (ticket-reply authors, not real staff) never
+         // belong in the admin user-management page.
+         role: { notIn: [Role.ai, Role.customer] },
          ...(search && {
             email: { contains: search, mode: 'insensitive' as const },
          }),

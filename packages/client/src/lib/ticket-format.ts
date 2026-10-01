@@ -10,6 +10,18 @@ export function formatCategory(category: TicketCategory): string {
    return category.replace(/_/g, ' ');
 }
 
+export const CATEGORY_BADGE_VARIANT: Record<
+   TicketCategory,
+   'secondary' | 'outline' | 'warning'
+> = {
+   [TicketCategory.GeneralQuestion]: 'outline',
+   [TicketCategory.TechnicalQuestion]: 'secondary',
+   // Refund requests are financial and time-sensitive, so they get the same
+   // warm/warning color as an 'open' ticket status — the one that should
+   // pull the eye in a list.
+   [TicketCategory.RefundRequest]: 'warning',
+};
+
 export const STATUS_BADGE_VARIANT: Record<
    TicketStatus,
    'warning' | 'success' | 'outline'

@@ -17,7 +17,11 @@ import { Badge } from '../components/ui/badge';
 import { TableSkeleton } from '../components/ui/skeletons';
 import { TableHead, TableHeader, TableRow } from '../components/ui/table';
 import { useDebouncedValue } from '../hooks/use-debounced-value';
-import { formatCategory, STATUS_BADGE_VARIANT } from '../lib/ticket-format';
+import {
+   CATEGORY_BADGE_VARIANT,
+   formatCategory,
+   STATUS_BADGE_VARIANT,
+} from '../lib/ticket-format';
 
 export type ApiTicket = {
    id: number;
@@ -105,7 +109,10 @@ const columns: ColumnDef<ApiTicket>[] = [
       cell: ({ row }) => {
          const category = row.getValue<TicketCategory | null>('category');
          return category ? (
-            <Badge variant="outline" className="capitalize">
+            <Badge
+               variant={CATEGORY_BADGE_VARIANT[category]}
+               className="capitalize"
+            >
                {formatCategory(category)}
             </Badge>
          ) : (

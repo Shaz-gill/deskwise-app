@@ -55,11 +55,16 @@ export function LoginPage() {
    }
 
    return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-muted p-4">
-         <div className="mb-8">
+      <div className="relative flex min-h-screen flex-col items-center justify-center overflow-hidden bg-background p-4">
+         <div className="login-ledger-lines pointer-events-none absolute inset-0" />
+         <div className="login-margin-rule pointer-events-none absolute inset-y-0 left-[14%] w-px" />
+         <div className="pointer-events-none absolute -top-40 right-[-6rem] h-[26rem] w-[26rem] rounded-full bg-primary/25 blur-[110px]" />
+         <div className="pointer-events-none absolute bottom-[-8rem] left-[-6rem] h-[22rem] w-[22rem] rounded-full bg-accent/50 blur-[100px]" />
+
+         <div className="relative z-10 mb-8">
             <Logo size="lg" />
          </div>
-         <Card className="w-full max-w-sm shadow-lg">
+         <Card className="relative z-10 w-full max-w-sm border-border/70 bg-card/95 shadow-lg backdrop-blur-sm">
             <CardHeader>
                <CardTitle className="text-2xl">Welcome back</CardTitle>
                <CardDescription>

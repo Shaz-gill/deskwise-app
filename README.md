@@ -44,27 +44,27 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 
 ### Login
 
-![Login](screenshots/login.png)
+![Login](/docs/screenshots/login.png)
 
 ### Dashboard
 
-![Dashboard](screenshots/dashboard.png)
+![Dashboard](/docs/screenshots/dashboard.png)
 
 ### Tickets List
 
-![Tickets List](screenshots/tickets.png)
+![Tickets List](/docs/screenshots/tickets.png)
 
 ### Ticket Detail — Resolved by AI
 
-![Ticket Detail](screenshots/ticket-detail.png)
+![Ticket Detail](/docs/screenshots/ticket-detail.png)
 
 ### Knowledge Base (RAG document management)
 
-![Knowledge Base](screenshots/knowledge-base.png)
+![Knowledge Base](/docs/screenshots/knowledge-base.png)
 
 ### User Management
 
-![User Management](screenshots/users.png)
+![User Management](/docs/screenshots/users.png)
 
 ## Features
 
@@ -378,12 +378,14 @@ cd packages/server
 bunx prisma migrate dev
 cd ../..
 
-# 4. Seed demo data (from packages/server, in this order)
+# 4. Seed demo data (from packages/server, in this order — deterministic
+#    and safe to re-run; see packages/server/prisma/scripts/README.md for
+#    the full reset/reseed runbook)
 cd packages/server
-bun run seed                 # admin user
-bun run seed:users           # demo agent roster
-bun run seed:tickets         # 100 demo tickets
-bun run seed:knowledge-base  # 6 demo policy PDFs, ingested into Pinecone
+bun run seed                 # admin user + the AI Assistant bot account
+bun run seed:users           # demo agent roster, grouped into informal support teams
+bun run seed:tickets         # 140 demo tickets with reply threads, for a fictional online-learning-platform tenant ("Pathlight Academy")
+bun run seed:knowledge-base  # 10 demo help-center PDFs, ingested into Pinecone
 cd ../..
 
 # 5. Run it

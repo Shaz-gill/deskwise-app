@@ -16,6 +16,7 @@ enum Role {
   admin
   user
   ai
+  customer
 }
 
 model User {

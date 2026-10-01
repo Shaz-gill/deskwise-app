@@ -166,3 +166,39 @@
       @apply font-sans;
    }
 }
+
+/*
+ * Decorative background for LoginPage: faint ledger-style rule lines
+ * (a nod to the "Indigo Ledger" palette) and a margin rule, both masked
+ * to fade toward the edges rather than tiling uniformly.
+ */
+.login-ledger-lines {
+   background-image: repeating-linear-gradient(
+      to bottom,
+      transparent,
+      transparent calc(2.75rem - 1px),
+      var(--border) calc(2.75rem - 1px),
+      var(--border) 2.75rem
+   );
+   -webkit-mask-image: radial-gradient(
+      ellipse 60% 50% at 50% 40%,
+      black 0%,
+      transparent 72%
+   );
+   mask-image: radial-gradient(
+      ellipse 60% 50% at 50% 40%,
+      black 0%,
+      transparent 72%
+   );
+}
+
+.login-margin-rule {
+   background-image: linear-gradient(
+      to bottom,
+      transparent,
+      var(--accent-foreground) 15%,
+      var(--accent-foreground) 85%,
+      transparent
+   );
+   opacity: 0.12;
+}
