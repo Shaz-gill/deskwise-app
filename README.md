@@ -206,6 +206,47 @@ At the very same moment, a second, completely separate little robot reads that s
  human's pick    robot's label
 ```
 
+### Knowledge-base ingestion, in plain English
+
+Same mailroom, but now picture an admin dropping a new policy PDF into the robot's rulebook. The robot doesn't just staple it in — it reads it, copies out all the small pieces, and files each piece somewhere it can find it again fast later.
+
+```
+      admin uploads PDF
+              |
+              v
+         PROCESSING -------- saved to disk, not searchable yet
+              |
+              v
+       extract the text
+              |
+              v
+     split into overlapping
+          chunks
+              |
+              v
+    embed each chunk into
+        a vector (OpenAI)
+              |
+              v
+    store the vectors in
+      Pinecone, tagged with
+      this document's id
+              |
+     +------------------+
+     |                  |
+     v                  v
+  everything          something
+   worked               broke
+     |                  |
+     v                  v
+   READY               FAILED
+(chunks are now      (error saved,
+ searchable by the    admin can see
+ auto-resolve robot)  why it failed)
+```
+
+Only once a document reaches `READY` can its chunks actually be found by the auto-resolution search above — a document stuck in `PROCESSING` or `FAILED` is invisible to it, the same way a `NEW`/`PROCESSING` ticket is invisible to agents.
+
 ### How the RAG pipeline works
 
 Deskwise's knowledge base is a complete retrieval-augmented generation loop — an ingestion (write) half and a retrieval-and-generation (read) half — not just a document store bolted onto a chatbot.
