@@ -9,6 +9,7 @@ import { getAiAssistantUser } from '../lib/tickets/ai-assistant-user';
 import { autoResolveTicket } from '../lib/tickets/auto-resolve-ticket';
 import { searchKnowledgeBase } from '../lib/knowledge-base/search-knowledge-base';
 import { boss } from '../lib/queue';
+import { SEND_REPLY_EMAIL_QUEUE } from './send-reply-email-job';
 
 // Queue name shared between the producer (routes/tickets.ts's inbound-email
 // webhook, create-ticket branch only) and this worker.
@@ -91,7 +92,11 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                     });
 
             if (canResolve && reply) {
-               await prisma.$transaction(async (tx) => {
+               // Returns the created reply's id (or undefined if the
+               // guarded transition below was skipped) so the email
+               // enqueue after the transaction commits knows whether
+               // there's actually a reply to send.
+               const createdReplyId = await prisma.$transaction(async (tx) => {
                   // Guarded processing -> resolved transition: if an agent
                   // already moved the ticket while this job was in flight,
                   // count === 0 and we skip posting a reply entirely, so we
@@ -100,17 +105,35 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                      where: { id: ticketId, status: TicketStatus.processing },
                      data: { status: TicketStatus.resolved },
                   });
-                  if (count === 0) return;
+                  if (count === 0) return undefined;
 
-                  await tx.ticketReply.create({
+                  const createdReply = await tx.ticketReply.create({
                      data: {
                         body: reply,
                         ticketId,
                         authorId: aiUser.id,
                         senderType: TicketReplySenderType.ai,
                      },
+                     select: { id: true },
                   });
+                  return createdReply.id;
                });
+
+               // Fire-and-forget, outside the transaction so a slow
+               // enqueue never holds the DB transaction open — same
+               // contract as the webhook's classify/auto-resolve enqueues:
+               // emailing the customer runs asynchronously in
+               // jobs/send-reply-email-job.ts's worker, and a failure to
+               // enqueue is logged rather than affecting ticket state.
+               if (createdReplyId !== undefined) {
+                  try {
+                     await boss.send(SEND_REPLY_EMAIL_QUEUE, {
+                        replyId: createdReplyId,
+                     });
+                  } catch (err) {
+                     console.error('Failed to enqueue reply email:', err);
+                  }
+               }
             } else {
                await prisma.ticket.updateMany({
                   where: { id: ticketId, status: TicketStatus.processing },

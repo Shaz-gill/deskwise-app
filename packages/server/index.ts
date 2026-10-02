@@ -16,6 +16,7 @@ import { ensureKnowledgeBaseDir } from './lib/knowledge-base/path';
 import { registerClassifyTicketWorker } from './jobs/classify-ticket-job';
 import { registerAutoResolveTicketWorker } from './jobs/auto-resolve-ticket-job';
 import { registerIngestDocumentWorker } from './jobs/ingest-document-job';
+import { registerSendReplyEmailWorker } from './jobs/send-reply-email-job';
 
 dotenv.config();
 
@@ -64,6 +65,7 @@ await startQueue();
 await registerClassifyTicketWorker();
 await registerAutoResolveTicketWorker();
 await registerIngestDocumentWorker();
+await registerSendReplyEmailWorker();
 
 // Uploaded knowledge base files are saved here (see routes/knowledge-docs.ts)
 await ensureKnowledgeBaseDir();

@@ -74,6 +74,7 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 - Ticket detail view with a threaded reply history
 - Assignment to agents, status transitions (Open → Resolved → Closed)
 - Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates
+- Outbound email sending via SendGrid — every agent reply and AI auto-resolution reply is emailed to the customer, off the request path via a pg-boss job
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
 
@@ -114,6 +115,7 @@ flowchart TB
         ClassifyJob[classify-ticket job]
         AutoResolveJob["auto-resolve-ticket job<br/>new → processing → resolved / open"]
         IngestJob[ingest-document job]
+        EmailJob[send-reply-email job]
     end
 
     subgraph AI["AI / Vector layer"]
@@ -122,11 +124,15 @@ flowchart TB
         Pinecone[(Pinecone<br/>vector store)]
     end
 
+    SendGrid[(SendGrid<br/>outbound email)]
+
     UI -->|HTTPS| Auth --> Routes
     Routes <--> DB
     Routes -->|enqueue, fire-and-forget| ClassifyJob
     Routes -->|enqueue, fire-and-forget| AutoResolveJob
     Routes -->|enqueue, fire-and-forget| IngestJob
+    Routes -->|enqueue, fire-and-forget| EmailJob
+    AutoResolveJob -->|enqueue, fire-and-forget| EmailJob
     ClassifyJob --> LC
     AutoResolveJob -->|1. retrieve top-K chunks| Pinecone
     AutoResolveJob -->|2. grounded decide + draft| LC
@@ -136,6 +142,7 @@ flowchart TB
     ClassifyJob --> DB
     AutoResolveJob -->|reply + status| DB
     IngestJob --> DB
+    EmailJob --> SendGrid
 ```
 
 **Key decisions worth knowing about:**
@@ -146,6 +153,7 @@ flowchart TB
 - **Fail loud, never auto-provision.** If the configured Pinecone index doesn't exist, or its dimension doesn't match the embedding model's output, ingestion (and auto-resolution's retrieval step) fails immediately with a clear error rather than the app silently creating or resizing infrastructure on your behalf — an auto-resolution failure specifically falls back to leaving the ticket `open` for a human, never stuck mid-pipeline.
 - **Soft delete over hard delete.** Deleting a user never removes the row — it sets `deletedAt`, revokes every session, and frees the email address for reuse by overwriting it, so ticket history stays intact for anyone who worked a ticket in the past.
 - **Local file storage today, object storage next.** Uploaded knowledge-base documents currently live on local disk (gitignored) — the deliberate, simplest option for the current stage. Migrating to S3 is planned once the app moves onto AWS infrastructure (see [Roadmap](#roadmap)).
+- **Outbound email is a direct SendGrid call, not LangChain.** The LangChain-only rule above is scoped to AI/LLM access — SendGrid is a transactional email provider, so `lib/email/send-email.ts` calls `@sendgrid/mail` directly, the same way `lib/knowledge-base/pinecone.ts` calls the Pinecone SDK directly. Sending is always handed to the `send-reply-email` pg-boss job rather than done inline, so neither an agent's reply submission nor the auto-resolve job ever blocks on SendGrid.
 
 ### Auto-resolution, in plain English
 
@@ -291,7 +299,7 @@ shadcn/ui component system, built on Base UI primitives · React Hook Form + Zod
 [![Prisma](https://img.shields.io/badge/Prisma_7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
 [![Zod](https://img.shields.io/badge/Zod-4-3E67B1?logo=zod&logoColor=white)](https://zod.dev)
 
-Better Auth (session-based) · pg-boss (Postgres-backed job queue) · Helmet · express-rate-limit · DOMPurify + jsdom · multer
+Better Auth (session-based) · pg-boss (Postgres-backed job queue) · Helmet · express-rate-limit · DOMPurify + jsdom · multer · SendGrid (outbound email)
 
 </td>
 </tr>
@@ -468,8 +476,7 @@ The goal wasn't "AI wrote this app" — it's using AI the way a competent engine
 ## Roadmap
 
 - ✍️ Agent-facing suggested-reply drafting (an AI-written first draft for a human to review, as opposed to polishing an agent's own draft or full auto-resolution)
-- 📤 Outbound email sending (currently inbound-only via webhook)
-- 📧 Real email-provider ingestion (SendGrid/Mailgun — currently a generic secret-gated JSON webhook)
+- 📧 Real email-provider ingestion (SendGrid/Mailgun inbound parse — currently a generic secret-gated JSON webhook)
 - 🐳 Docker + cloud deployment configuration
 - ☁️ Migrate knowledge-base file storage from local disk to AWS S3 once the app moves onto AWS infrastructure
 

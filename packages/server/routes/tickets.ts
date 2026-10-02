@@ -20,6 +20,7 @@ import { summarizeTicket } from '../lib/tickets/summarize-ticket';
 import { parseIntParam, validateBody } from '../lib/validate';
 import { CLASSIFY_TICKET_QUEUE } from '../jobs/classify-ticket-job';
 import { AUTO_RESOLVE_TICKET_QUEUE } from '../jobs/auto-resolve-ticket-job';
+import { SEND_REPLY_EMAIL_QUEUE } from '../jobs/send-reply-email-job';
 import { requireAuth } from '../middleware/require-auth';
 import {
    inboundEmailLimiter,
@@ -369,6 +370,17 @@ ticketsRouter.post(
          },
          select: TICKET_REPLY_SELECT,
       });
+
+      // Fire-and-forget, same contract as the inbound-email webhook's
+      // classify/auto-resolve enqueues below: emailing the customer runs
+      // asynchronously in jobs/send-reply-email-job.ts's worker, so this
+      // response doesn't wait on SendGrid. A failure to enqueue is logged
+      // rather than failing the request — the reply is already saved.
+      try {
+         await boss.send(SEND_REPLY_EMAIL_QUEUE, { replyId: reply.id });
+      } catch (err) {
+         console.error('Failed to enqueue reply email:', err);
+      }
 
       res.status(201).json({ reply });
    }
