@@ -1,7 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
+// Must be imported before anything else so Sentry can instrument modules
+// required afterwards.
+import { Sentry } from './lib/sentry';
+
 import express from 'express';
 import type { Request, Response } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import helmet from 'helmet';
 import { toNodeHandler } from 'better-auth/node';
 import { auth } from './lib/auth';
@@ -17,8 +23,6 @@ import { registerClassifyTicketWorker } from './jobs/classify-ticket-job';
 import { registerAutoResolveTicketWorker } from './jobs/auto-resolve-ticket-job';
 import { registerIngestDocumentWorker } from './jobs/ingest-document-job';
 import { registerSendReplyEmailWorker } from './jobs/send-reply-email-job';
-
-dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -69,6 +73,10 @@ await registerSendReplyEmailWorker();
 
 // Uploaded knowledge base files are saved here (see routes/knowledge-docs.ts)
 await ensureKnowledgeBaseDir();
+
+// Reports errors from route handlers to Sentry; must come after all
+// routes and before our own errorHandler, which still owns the response.
+Sentry.setupExpressErrorHandler(app);
 
 app.use(errorHandler);
 

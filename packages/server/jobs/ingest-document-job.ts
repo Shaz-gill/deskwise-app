@@ -3,6 +3,7 @@ import { KnowledgeDocStatus } from '../generated/prisma/enums';
 import prisma from '../db';
 import { ingestDocument } from '../lib/knowledge-base/ingest-document';
 import { boss } from '../lib/queue';
+import { Sentry } from '../lib/sentry';
 
 // Queue name shared between the producer (routes/knowledge-docs.ts's POST /
 // calls boss.send(INGEST_DOCUMENT_QUEUE, ...)) and this worker.
@@ -45,6 +46,7 @@ export async function registerIngestDocumentWorker(): Promise<void> {
             });
          } catch (err) {
             console.error('Failed to ingest document:', err);
+            Sentry.captureException(err);
 
             // Caught (not rethrown, unlike classify-ticket-job's worker):
             // this failure already has a durable, user-visible sink — the

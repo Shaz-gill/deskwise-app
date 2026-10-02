@@ -12,6 +12,7 @@ Support emails become tickets that are auto-classified, summarized, and given AI
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Prisma_7-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![LangChain](https://img.shields.io/badge/LangChain-OpenAI-1C3C3C?logo=langchain&logoColor=white)](https://www.langchain.com)
 [![Pinecone](https://img.shields.io/badge/Pinecone-Vector_DB-000000?logoColor=white)](https://www.pinecone.io)
+[![Sentry](https://img.shields.io/badge/Sentry-Error_Tracking-362D59?logo=sentry&logoColor=white)](https://sentry.io)
 [![Bun](https://img.shields.io/badge/Bun-Workspaces-000000?logo=bun&logoColor=white)](https://bun.sh)
 
 </div>
@@ -154,6 +155,7 @@ flowchart TB
 - **Soft delete over hard delete.** Deleting a user never removes the row — it sets `deletedAt`, revokes every session, and frees the email address for reuse by overwriting it, so ticket history stays intact for anyone who worked a ticket in the past.
 - **Local file storage today, object storage next.** Uploaded knowledge-base documents currently live on local disk (gitignored) — the deliberate, simplest option for the current stage. Migrating to S3 is planned once the app moves onto AWS infrastructure (see [Roadmap](#roadmap)).
 - **Outbound email is a direct SendGrid call, not LangChain.** The LangChain-only rule above is scoped to AI/LLM access — SendGrid is a transactional email provider, so `lib/email/send-email.ts` calls `@sendgrid/mail` directly, the same way `lib/knowledge-base/pinecone.ts` calls the Pinecone SDK directly. Sending is always handed to the `send-reply-email` pg-boss job rather than done inline, so neither an agent's reply submission nor the auto-resolve job ever blocks on SendGrid.
+- **Error tracking covers more than the request/response path.** Sentry (`@sentry/node` server-side, `@sentry/react` client-side) is wired up beyond the automatic cases (uncaught exceptions, unhandled promise rejections, Express route errors, React render crashes via a top-level `Sentry.ErrorBoundary`). A lot of this codebase deliberately catches an error, logs it, and keeps going instead of letting it bubble up — a failed job-enqueue, auto-resolve's fallback-to-`open` catch, a pg-boss worker that intentionally rethrows so pg-boss owns retry/backoff — and each of those sites calls `Sentry.captureException(err)` explicitly, since Sentry's automatic integrations would never otherwise see them. Both DSNs are optional; `Sentry.init()` silently no-ops without one, so it's safe to leave configured in every environment including local dev.
 
 ### Auto-resolution, in plain English
 
@@ -285,7 +287,7 @@ This read path only ever runs once, at ticket creation — a follow-up email to 
 [![TanStack Query](https://img.shields.io/badge/TanStack_Query-5-FF4154?logo=reactquery&logoColor=white)](https://tanstack.com/query)
 [![TanStack Table](https://img.shields.io/badge/TanStack_Table-8-FF4154?logo=reacttable&logoColor=white)](https://tanstack.com/table)
 
-shadcn/ui component system, built on Base UI primitives · React Hook Form + Zod resolvers · Quill rich-text editor
+shadcn/ui component system, built on Base UI primitives · React Hook Form + Zod resolvers · Quill rich-text editor · Sentry (error tracking)
 
 </td>
 <td valign="top" width="50%">
@@ -299,7 +301,7 @@ shadcn/ui component system, built on Base UI primitives · React Hook Form + Zod
 [![Prisma](https://img.shields.io/badge/Prisma_7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
 [![Zod](https://img.shields.io/badge/Zod-4-3E67B1?logo=zod&logoColor=white)](https://zod.dev)
 
-Better Auth (session-based) · pg-boss (Postgres-backed job queue) · Helmet · express-rate-limit · DOMPurify + jsdom · multer · SendGrid (outbound email)
+Better Auth (session-based) · pg-boss (Postgres-backed job queue) · Helmet · express-rate-limit · DOMPurify + jsdom · multer · SendGrid (outbound email) · Sentry (error tracking)
 
 </td>
 </tr>
@@ -378,6 +380,7 @@ This section documents the actual mechanisms in the codebase, not a generic chec
 **Error Handling**
 
 - A single centralized error handler maps known Prisma errors to the right HTTP status (unique-constraint → 409, not-found → 404) and returns a generic message for everything else — internal error details and stack traces are never leaked to the client
+- Sentry reports errors server- and client-side for operational visibility, entirely separate from what's shown to the user — the client response above stays generic regardless of what Sentry captures
 
 **Data Handling**
 
@@ -420,6 +423,22 @@ cp packages/server/.env.example packages/server/.env
 | `OPENAI_EMBEDDING_MODEL`         | Optional, defaults to `text-embedding-3-small` (1536 dimensions)                                      |
 | `PINECONE_API_KEY`               | Pinecone API key                                                                                      |
 | `PINECONE_INDEX_NAME`            | Name of an **existing** Pinecone index with a matching dimension — this app never creates one for you |
+| `SENDGRID_API_KEY`               | Sends outbound reply emails                                                                           |
+| `SENDGRID_FROM_EMAIL`            | A verified SendGrid sender (Single Sender or domain auth)                                             |
+| `SENDGRID_FROM_NAME`             | Optional, defaults to `Customer Support`                                                              |
+| `SENTRY_DSN`                     | Optional — server-side error tracking; unset means Sentry silently no-ops                             |
+| `SENTRY_ENVIRONMENT`             | Optional — environment tag on Sentry events, falls back to `NODE_ENV`                                 |
+
+The client has its own optional env file, used only for client-side error tracking — everything above is server-only:
+
+```bash
+cp packages/client/.env.example packages/client/.env
+```
+
+| Variable                  | Purpose                                                                    |
+| -------------------------- | --------------------------------------------------------------------------- |
+| `VITE_SENTRY_DSN`         | Optional — client-side error tracking; unset means Sentry silently no-ops |
+| `VITE_SENTRY_ENVIRONMENT` | Optional — environment tag on Sentry events, falls back to Vite's `MODE`  |
 
 ```bash
 # 3. Set up the database (run these yourself — they need an interactive terminal)

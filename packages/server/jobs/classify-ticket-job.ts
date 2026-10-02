@@ -2,6 +2,7 @@ import type { Job } from 'pg-boss';
 import prisma from '../db';
 import { classifyTicket } from '../lib/tickets/classify-ticket';
 import { boss } from '../lib/queue';
+import { Sentry } from '../lib/sentry';
 
 // Queue name shared between the producer (routes/tickets.ts's inbound-email
 // webhook calls boss.send(CLASSIFY_TICKET_QUEUE, ...)) and this worker —
@@ -31,27 +32,36 @@ export async function registerClassifyTicketWorker(): Promise<void> {
       async ([job]: Job<ClassifyTicketJobData>[]) => {
          if (!job) return;
 
-         const ticket = await prisma.ticket.findUnique({
-            where: { id: job.data.ticketId },
-            select: { subject: true, body: true },
-         });
+         try {
+            const ticket = await prisma.ticket.findUnique({
+               where: { id: job.data.ticketId },
+               select: { subject: true, body: true },
+            });
 
-         // Ticket may no longer exist by the time this job runs — nothing
-         // to classify.
-         if (!ticket) return;
+            // Ticket may no longer exist by the time this job runs —
+            // nothing to classify.
+            if (!ticket) return;
 
-         const category = await classifyTicket({
-            subject: ticket.subject,
-            body: ticket.body,
-         });
+            const category = await classifyTicket({
+               subject: ticket.subject,
+               body: ticket.body,
+            });
 
-         // `category: null` guard: don't clobber a category an agent has
-         // since set by hand (routes/tickets.ts's PATCH /:id) just because
-         // this job happened to run late.
-         await prisma.ticket.updateMany({
-            where: { id: job.data.ticketId, category: null },
-            data: { category },
-         });
+            // `category: null` guard: don't clobber a category an agent has
+            // since set by hand (routes/tickets.ts's PATCH /:id) just
+            // because this job happened to run late.
+            await prisma.ticket.updateMany({
+               where: { id: job.data.ticketId, category: null },
+               data: { category },
+            });
+         } catch (err) {
+            // Reported here (unlike pg-boss's own retry/dead-letter
+            // bookkeeping) so a persistently failing classification is
+            // actually visible, then rethrown so pg-boss still owns
+            // retry/backoff as before.
+            Sentry.captureException(err);
+            throw err;
+         }
       }
    );
 }

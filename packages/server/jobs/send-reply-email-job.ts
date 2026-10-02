@@ -2,6 +2,7 @@ import type { Job } from 'pg-boss';
 import prisma from '../db';
 import { sendEmail } from '../lib/email/send-email';
 import { boss } from '../lib/queue';
+import { Sentry } from '../lib/sentry';
 
 // Queue name shared between the producers (routes/tickets.ts's reply-create
 // route, and jobs/auto-resolve-ticket-job.ts's AI-reply branch) and this
@@ -28,32 +29,39 @@ export async function registerSendReplyEmailWorker(): Promise<void> {
       async ([job]: Job<SendReplyEmailJobData>[]) => {
          if (!job) return;
 
-         const reply = await prisma.ticketReply.findUnique({
-            where: { id: job.data.replyId },
-            select: {
-               body: true,
-               bodyHtml: true,
-               ticket: {
-                  select: {
-                     subject: true,
-                     senderEmail: true,
-                     senderName: true,
+         try {
+            const reply = await prisma.ticketReply.findUnique({
+               where: { id: job.data.replyId },
+               select: {
+                  body: true,
+                  bodyHtml: true,
+                  ticket: {
+                     select: {
+                        subject: true,
+                        senderEmail: true,
+                        senderName: true,
+                     },
                   },
                },
-            },
-         });
+            });
 
-         // Reply may no longer exist by the time this job runs — nothing
-         // to send.
-         if (!reply) return;
+            // Reply may no longer exist by the time this job runs —
+            // nothing to send.
+            if (!reply) return;
 
-         await sendEmail({
-            to: reply.ticket.senderEmail,
-            toName: reply.ticket.senderName,
-            subject: `Re: ${reply.ticket.subject}`,
-            text: reply.body,
-            html: reply.bodyHtml,
-         });
+            await sendEmail({
+               to: reply.ticket.senderEmail,
+               toName: reply.ticket.senderName,
+               subject: `Re: ${reply.ticket.subject}`,
+               text: reply.body,
+               html: reply.bodyHtml,
+            });
+         } catch (err) {
+            // Reported here, then rethrown so pg-boss still owns
+            // retry/backoff as before.
+            Sentry.captureException(err);
+            throw err;
+         }
       }
    );
 }

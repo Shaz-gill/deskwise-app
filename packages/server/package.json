@@ -32,6 +32,7 @@
       "@prisma/adapter-pg": "^7.9.1",
       "@prisma/client": "^7.9.1",
       "@sendgrid/mail": "^8.1.6",
+      "@sentry/node": "^11.3.0",
       "better-auth": "^1.6.29",
       "core": "workspace:*",
       "cors": "^2.8.6",

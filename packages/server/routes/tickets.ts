@@ -14,6 +14,7 @@ import {
    TicketReplySenderType,
 } from '../generated/prisma/enums';
 import { boss } from '../lib/queue';
+import { Sentry } from '../lib/sentry';
 import { polishReply } from '../lib/tickets/polish-reply';
 import { sanitizeHtml } from '../lib/sanitize-html';
 import { summarizeTicket } from '../lib/tickets/summarize-ticket';
@@ -380,6 +381,7 @@ ticketsRouter.post(
          await boss.send(SEND_REPLY_EMAIL_QUEUE, { replyId: reply.id });
       } catch (err) {
          console.error('Failed to enqueue reply email:', err);
+         Sentry.captureException(err);
       }
 
       res.status(201).json({ reply });
@@ -422,6 +424,7 @@ ticketsRouter.post(
          res.json({ polishedBody });
       } catch (err) {
          console.error('Failed to polish reply:', err);
+         Sentry.captureException(err);
          res.status(500).json({ error: 'Failed to polish reply' });
       }
    }
@@ -477,6 +480,7 @@ ticketsRouter.post(
          // reaching this catch is an OpenAI/network failure from
          // summarizeTicket(), same as polish-reply.ts's route.
          console.error('Failed to summarize ticket:', err);
+         Sentry.captureException(err);
          res.status(500).json({ error: 'Failed to summarize ticket' });
       }
    }
@@ -531,6 +535,7 @@ ticketsRouter.post(
          await boss.send(CLASSIFY_TICKET_QUEUE, { ticketId: ticket.id });
       } catch (err) {
          console.error('Failed to enqueue ticket classification:', err);
+         Sentry.captureException(err);
       }
 
       // Same fire-and-forget contract as classification above: auto-
@@ -544,6 +549,7 @@ ticketsRouter.post(
          await boss.send(AUTO_RESOLVE_TICKET_QUEUE, { ticketId: ticket.id });
       } catch (err) {
          console.error('Failed to enqueue ticket auto-resolution:', err);
+         Sentry.captureException(err);
          await prisma.ticket.updateMany({
             where: { id: ticket.id, status: TicketStatus.new },
             data: { status: TicketStatus.open },

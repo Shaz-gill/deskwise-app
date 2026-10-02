@@ -9,6 +9,7 @@ import { INGEST_DOCUMENT_QUEUE } from '../jobs/ingest-document-job';
 import { KNOWLEDGE_BASE_DIR } from '../lib/knowledge-base/path';
 import { deleteDocVectors } from '../lib/knowledge-base/pinecone';
 import { boss } from '../lib/queue';
+import { Sentry } from '../lib/sentry';
 import { parseIntParam } from '../lib/validate';
 import { knowledgeUploadLimiter } from '../middleware/rate-limiters';
 import { requireAdmin } from '../middleware/require-admin';
@@ -115,6 +116,7 @@ knowledgeDocsRouter.post(
          await boss.send(INGEST_DOCUMENT_QUEUE, { docId: doc.id });
       } catch (err) {
          console.error('Failed to enqueue document ingestion:', err);
+         Sentry.captureException(err);
       }
 
       res.status(201).json({ doc });
@@ -180,12 +182,14 @@ knowledgeDocsRouter.delete(
          await deleteDocVectors(doc.id);
       } catch (err) {
          console.error(`Failed to delete Pinecone vectors for doc ${id}:`, err);
+         Sentry.captureException(err);
       }
 
       try {
          await fs.rm(doc.path, { force: true });
       } catch (err) {
          console.error(`Failed to delete file for doc ${id}:`, err);
+         Sentry.captureException(err);
       }
 
       await prisma.knowledgeDoc.delete({ where: { id } });

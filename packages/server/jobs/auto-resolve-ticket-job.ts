@@ -9,6 +9,7 @@ import { getAiAssistantUser } from '../lib/tickets/ai-assistant-user';
 import { autoResolveTicket } from '../lib/tickets/auto-resolve-ticket';
 import { searchKnowledgeBase } from '../lib/knowledge-base/search-knowledge-base';
 import { boss } from '../lib/queue';
+import { Sentry } from '../lib/sentry';
 import { SEND_REPLY_EMAIL_QUEUE } from './send-reply-email-job';
 
 // Queue name shared between the producer (routes/tickets.ts's inbound-email
@@ -132,6 +133,7 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                      });
                   } catch (err) {
                      console.error('Failed to enqueue reply email:', err);
+                     Sentry.captureException(err);
                   }
                }
             } else {
@@ -145,6 +147,7 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                `Auto-resolve failed for ticket ${ticketId}, leaving it open for a human:`,
                err
             );
+            Sentry.captureException(err);
             await prisma.ticket.updateMany({
                where: { id: ticketId, status: TicketStatus.processing },
                data: { status: TicketStatus.open, assignedToId: null },
