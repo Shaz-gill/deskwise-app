@@ -87,11 +87,11 @@ function formatAgentEmail(
    agentName: string,
    message: string
 ): string {
-   return `Hi ${firstName(customerName)},\n\n${message}\n\nBest,\n${firstName(agentName)}\nPathlight Academy Support`;
+   return `Hi ${firstName(customerName)},\n\n${message}\n\nBest,\n${firstName(agentName)}`;
 }
 
 function formatAiEmail(customerName: string, message: string): string {
-   return `Hi ${firstName(customerName)},\n\n${message}\n\nBest,\nPathlight AI Assistant`;
+   return `Hi ${firstName(customerName)},\n\n${message}\n\nBest regards,\nCustomer Support`;
 }
 
 // ---------------------------------------------------------------------

@@ -375,7 +375,7 @@ ticketsRouter.post(
       // Fire-and-forget, same contract as the inbound-email webhook's
       // classify/auto-resolve enqueues below: emailing the customer runs
       // asynchronously in jobs/send-reply-email-job.ts's worker, so this
-      // response doesn't wait on SendGrid. A failure to enqueue is logged
+      // response doesn't wait on SES. A failure to enqueue is logged
       // rather than failing the request — the reply is already saved.
       try {
          await boss.send(SEND_REPLY_EMAIL_QUEUE, { replyId: reply.id });

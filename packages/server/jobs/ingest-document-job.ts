@@ -32,7 +32,7 @@ export async function registerIngestDocumentWorker(): Promise<void> {
          try {
             const { chunkCount } = await ingestDocument({
                docId: doc.id,
-               filePath: doc.path,
+               storedPath: doc.path,
                filename: doc.filename,
             });
 

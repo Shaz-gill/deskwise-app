@@ -1,15 +1,13 @@
 import 'dotenv/config';
-import fs from 'node:fs/promises';
-import path from 'node:path';
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import prisma from '../../db';
 import { KnowledgeDocStatus, Role } from '../../generated/prisma/enums';
-import {
-   ensureKnowledgeBaseDir,
-   KNOWLEDGE_BASE_DIR,
-} from '../../lib/knowledge-base/path';
 import { ingestDocument } from '../../lib/knowledge-base/ingest-document';
 import { deleteDocVectors } from '../../lib/knowledge-base/pinecone';
+import {
+   deleteKnowledgeFile,
+   saveKnowledgeFile,
+} from '../../lib/knowledge-base/storage';
 
 // Dev-only seed: generates public-facing help-center PDFs for "Pathlight
 // Academy" (the fictional LMS demo tenant also used by seed-tickets.ts) and
@@ -587,8 +585,6 @@ async function renderDocPdf(
 }
 
 async function main() {
-   await ensureKnowledgeBaseDir();
-
    const uploader =
       (await prisma.user.findFirst({ where: { role: Role.admin } })) ??
       (await prisma.user.findFirst());
@@ -611,23 +607,22 @@ async function main() {
          console.error(`Failed to clean up vectors for ${doc.filename}:`, err);
       }
       await prisma.knowledgeDoc.delete({ where: { id: doc.id } });
-      await fs.unlink(doc.path).catch((err) => {
-         if (err?.code !== 'ENOENT') throw err;
-      });
+      await deleteKnowledgeFile(doc.path);
    }
 
    let created = 0;
 
    for (const doc of DOCS) {
       const pdfBytes = await renderDocPdf(doc.title, buildBlocks(doc));
-      const storedFilename = `${crypto.randomUUID()}-${doc.filename}`;
-      const filePath = path.join(KNOWLEDGE_BASE_DIR, storedFilename);
-      await fs.writeFile(filePath, pdfBytes);
+      const storedPath = await saveKnowledgeFile(
+         Buffer.from(pdfBytes),
+         doc.filename
+      );
 
       const row = await prisma.knowledgeDoc.create({
          data: {
             filename: doc.filename,
-            path: filePath,
+            path: storedPath,
             status: KnowledgeDocStatus.processing,
             uploadedById: uploader.id,
          },
@@ -640,7 +635,7 @@ async function main() {
       try {
          const { chunkCount } = await ingestDocument({
             docId: row.id,
-            filePath,
+            storedPath,
             filename: doc.filename,
          });
          await prisma.knowledgeDoc.update({

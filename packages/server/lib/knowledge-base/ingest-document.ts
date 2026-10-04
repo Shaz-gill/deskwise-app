@@ -3,6 +3,7 @@ import { chunkText } from './chunk-text';
 import { embeddingsModel } from './embeddings-model';
 import { extractText } from './extract-text';
 import { assertPineconeIndexReady } from './pinecone';
+import { readKnowledgeFile } from './storage';
 
 // The one orchestration function for turning an uploaded file into
 // searchable vectors — mirrors the "one lib/*.ts file, one function, plain
@@ -11,16 +12,17 @@ import { assertPineconeIndexReady } from './pinecone';
 // row's status transitions.
 export async function ingestDocument({
    docId,
-   filePath,
+   storedPath,
    filename,
 }: {
    docId: number;
-   filePath: string;
+   storedPath: string;
    filename: string;
 }): Promise<{ chunkCount: number }> {
    const pineconeIndex = await assertPineconeIndexReady();
 
-   const text = await extractText(filePath);
+   const buffer = await readKnowledgeFile(storedPath);
+   const text = await extractText(buffer, filename);
    const chunks = chunkText(text);
 
    if (chunks.length === 0) {

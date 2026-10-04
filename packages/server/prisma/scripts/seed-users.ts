@@ -12,7 +12,7 @@ import prisma from '../../db';
 // safe to re-run.
 const DEMO_PASSWORD = 'Password123!';
 
-export const ADMIN = { name: 'Shaz Gill', email: 'shaz.gill@pathlight.io' };
+export const ADMIN = { name: 'Shaz Gill', email: 'shaz.gill@deskwise.com' };
 
 // Informal, seed-data-only grouping — there's no `team` column on User, this
 // just drives which agents seed-tickets.ts picks as assignees for which
@@ -25,42 +25,42 @@ export const AGENTS: { name: string; email: string; team: AgentTeam }[] = [
    // billing side of team/business licenses.
    {
       name: 'Amara Johnson',
-      email: 'amara.johnson@pathlight.io',
+      email: 'amara.johnson@deskwise.com',
       team: 'billing',
    },
    {
       name: 'Ben Whitfield',
-      email: 'ben.whitfield@pathlight.io',
+      email: 'ben.whitfield@deskwise.com',
       team: 'billing',
    },
-   { name: 'Carmen Ruiz', email: 'carmen.ruiz@pathlight.io', team: 'billing' },
-   { name: 'Daniel Osei', email: 'daniel.osei@pathlight.io', team: 'billing' },
+   { name: 'Carmen Ruiz', email: 'carmen.ruiz@deskwise.com', team: 'billing' },
+   { name: 'Daniel Osei', email: 'daniel.osei@deskwise.com', team: 'billing' },
 
    // Platform & Technical Support — course access, video playback,
    // certificates, login/2FA.
    {
       name: 'Elena Petrova',
-      email: 'elena.petrova@pathlight.io',
+      email: 'elena.petrova@deskwise.com',
       team: 'technical',
    },
    {
       name: 'Farid Hassan',
-      email: 'farid.hassan@pathlight.io',
+      email: 'farid.hassan@deskwise.com',
       team: 'technical',
    },
    {
       name: 'Grace Lindqvist',
-      email: 'grace.lindqvist@pathlight.io',
+      email: 'grace.lindqvist@deskwise.com',
       team: 'technical',
    },
    {
       name: 'Harun Yilmaz',
-      email: 'harun.yilmaz@pathlight.io',
+      email: 'harun.yilmaz@deskwise.com',
       team: 'technical',
    },
    {
       name: 'Isla Fraser',
-      email: 'isla.fraser@pathlight.io',
+      email: 'isla.fraser@deskwise.com',
       team: 'technical',
    },
 
@@ -68,24 +68,24 @@ export const AGENTS: { name: string; email: string; team: AgentTeam }[] = [
    // publishing/review.
    {
       name: 'Jamal Thompson',
-      email: 'jamal.thompson@pathlight.io',
+      email: 'jamal.thompson@deskwise.com',
       team: 'instructor_success',
    },
    {
       name: 'Keiko Tanaka',
-      email: 'keiko.tanaka@pathlight.io',
+      email: 'keiko.tanaka@deskwise.com',
       team: 'instructor_success',
    },
    {
       name: 'Leo Moretti',
-      email: 'leo.moretti@pathlight.io',
+      email: 'leo.moretti@deskwise.com',
       team: 'instructor_success',
    },
 
    // Customer Success — General — non-billing team/license questions,
    // ambiguous/uncategorized tickets.
-   { name: 'Maya Iyer', email: 'maya.iyer@pathlight.io', team: 'general' },
-   { name: 'Nathan Cole', email: 'nathan.cole@pathlight.io', team: 'general' },
+   { name: 'Maya Iyer', email: 'maya.iyer@deskwise.com', team: 'general' },
+   { name: 'Nathan Cole', email: 'nathan.cole@deskwise.com', team: 'general' },
 ];
 
 async function main() {

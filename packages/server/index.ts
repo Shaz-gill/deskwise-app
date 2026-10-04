@@ -18,7 +18,6 @@ import { usersRouter } from './routes/users';
 import { ticketsRouter } from './routes/tickets';
 import { knowledgeDocsRouter } from './routes/knowledge-docs';
 import { startQueue } from './lib/queue';
-import { ensureKnowledgeBaseDir } from './lib/knowledge-base/path';
 import { registerClassifyTicketWorker } from './jobs/classify-ticket-job';
 import { registerAutoResolveTicketWorker } from './jobs/auto-resolve-ticket-job';
 import { registerIngestDocumentWorker } from './jobs/ingest-document-job';
@@ -70,9 +69,6 @@ await registerClassifyTicketWorker();
 await registerAutoResolveTicketWorker();
 await registerIngestDocumentWorker();
 await registerSendReplyEmailWorker();
-
-// Uploaded knowledge base files are saved here (see routes/knowledge-docs.ts)
-await ensureKnowledgeBaseDir();
 
 // Reports errors from route handlers to Sentry; must come after all
 // routes and before our own errorHandler, which still owns the response.

@@ -1,4 +1,3 @@
-import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Router } from 'express';
 import type { NextFunction, Request, Response } from 'express';
@@ -6,8 +5,12 @@ import multer from 'multer';
 import prisma from '../db';
 import { KnowledgeDocStatus } from '../generated/prisma/enums';
 import { INGEST_DOCUMENT_QUEUE } from '../jobs/ingest-document-job';
-import { KNOWLEDGE_BASE_DIR } from '../lib/knowledge-base/path';
 import { deleteDocVectors } from '../lib/knowledge-base/pinecone';
+import {
+   deleteKnowledgeFile,
+   readKnowledgeFile,
+   saveKnowledgeFile,
+} from '../lib/knowledge-base/storage';
 import { boss } from '../lib/queue';
 import { Sentry } from '../lib/sentry';
 import { parseIntParam } from '../lib/validate';
@@ -23,13 +26,11 @@ const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 // Extension, not mimetype, is the filter: browsers send an inconsistent
 // (sometimes empty) Content-Type for .md in particular, so the file's own
 // name is the more reliable signal here for all four supported types.
+// memoryStorage (not diskStorage) so the upload handler below can hand the
+// buffer to lib/knowledge-base/storage.ts, which decides where it actually
+// lands (S3 or local disk) — multer itself stays storage-backend-agnostic.
 const upload = multer({
-   storage: multer.diskStorage({
-      destination: KNOWLEDGE_BASE_DIR,
-      filename: (_req, file, cb) => {
-         cb(null, `${crypto.randomUUID()}-${file.originalname}`);
-      },
-   }),
+   storage: multer.memoryStorage(),
    limits: { fileSize: MAX_FILE_SIZE },
    fileFilter: (_req, file, cb) => {
       const extension = path.extname(file.originalname).toLowerCase();
@@ -103,10 +104,15 @@ knowledgeDocsRouter.post(
          return;
       }
 
+      const storedPath = await saveKnowledgeFile(
+         req.file.buffer,
+         req.file.originalname
+      );
+
       const doc = await prisma.knowledgeDoc.create({
          data: {
             filename: req.file.originalname,
-            path: req.file.path,
+            path: storedPath,
             status: KnowledgeDocStatus.processing,
             uploadedById: req.user.id,
          },
@@ -143,6 +149,14 @@ knowledgeDocsRouter.get(
          return;
       }
 
+      let buffer: Buffer;
+      try {
+         buffer = await readKnowledgeFile(doc.path);
+      } catch {
+         res.status(404).json({ error: 'File not found' });
+         return;
+      }
+
       // "inline" (not "attachment") so PDFs/text preview in the browser
       // tab rather than force-downloading; encodeURIComponent guards
       // against a filename breaking the header on special characters.
@@ -150,12 +164,8 @@ knowledgeDocsRouter.get(
          'Content-Disposition',
          `inline; filename="${encodeURIComponent(doc.filename)}"`
       );
-
-      res.sendFile(doc.path, (err) => {
-         if (err && !res.headersSent) {
-            res.status(404).json({ error: 'File not found on disk' });
-         }
-      });
+      res.type(path.extname(doc.filename));
+      res.send(buffer);
    }
 );
 
@@ -186,7 +196,7 @@ knowledgeDocsRouter.delete(
       }
 
       try {
-         await fs.rm(doc.path, { force: true });
+         await deleteKnowledgeFile(doc.path);
       } catch (err) {
          console.error(`Failed to delete file for doc ${id}:`, err);
          Sentry.captureException(err);

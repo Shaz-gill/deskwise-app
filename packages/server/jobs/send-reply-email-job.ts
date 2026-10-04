@@ -22,7 +22,7 @@ export async function registerSendReplyEmailWorker(): Promise<void> {
    // Letting an error here throw (rather than try/catch) is deliberate,
    // same as classify-ticket-job.ts: it signals the job as failed to
    // pg-boss, which then owns retry/backoff, rather than silently
-   // swallowing a SendGrid/network failure. Nothing else's state depends
+   // swallowing a SES/network failure. Nothing else's state depends
    // on the send succeeding, so a retry is always safe.
    await boss.work<SendReplyEmailJobData>(
       SEND_REPLY_EMAIL_QUEUE,
