@@ -74,7 +74,7 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 - Paginated, sortable, filterable ticket list (by subject, status, category)
 - Ticket detail view with a threaded reply history
 - Assignment to agents, status transitions (Open → Resolved → Closed)
-- Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates
+- Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates. In production this is fed by a real inbound email pipeline (AWS SES receipt rule → S3 → a small Lambda that parses the raw MIME and calls this same webhook), not just a manually-callable endpoint — see `deskwise-deployment/ARCHITECTURE.md`
 - Outbound email sending via AWS SES — every agent reply and AI auto-resolution reply is emailed to the customer, off the request path via a pg-boss job
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
@@ -97,57 +97,44 @@ Deskwise is a Bun workspace monorepo with three packages: `packages/server` (Exp
 
 The core architectural rule: **any request that would call an LLM or a vector database never blocks the HTTP response.** Ticket classification, automatic resolution, and knowledge-base ingestion are all handed off to [pg-boss](https://github.com/timgit/pg-boss) (a Postgres-backed job queue — no separate Redis/SQS infra needed) and processed by background workers, so a slow OpenAI call or a Pinecone hiccup can never make an API request hang.
 
-```mermaid
-flowchart TB
-    subgraph Client["React Client"]
-        UI[Tickets · Users · Knowledge Base]
-    end
-
-    subgraph API["Express API"]
-        Auth[Better Auth<br/>session middleware]
-        Routes[REST routes<br/>tickets · users · knowledge-docs]
-    end
-
-    subgraph Sync["Synchronous path"]
-        DB[(PostgreSQL<br/>via Prisma)]
-    end
-
-    subgraph Async["Async job pipeline (pg-boss)"]
-        ClassifyJob[classify-ticket job]
-        AutoResolveJob["auto-resolve-ticket job<br/>new → processing → resolved / open"]
-        IngestJob[ingest-document job]
-        EmailJob[send-reply-email job]
-    end
-
-    subgraph AI["AI / Vector layer"]
-        LC[LangChain]
-        OpenAI[OpenAI<br/>chat + embeddings]
-        Pinecone[(Pinecone<br/>vector store)]
-    end
-
-    SES[(AWS SES<br/>outbound email)]
-    Storage[(S3, or local disk fallback<br/>knowledge-base docs)]
-
-    UI -->|HTTPS| Auth --> Routes
-    Routes <--> DB
-    Routes -->|save file| Storage
-    Routes -->|enqueue, fire-and-forget| ClassifyJob
-    Routes -->|enqueue, fire-and-forget| AutoResolveJob
-    Routes -->|enqueue, fire-and-forget| IngestJob
-    Routes -->|enqueue, fire-and-forget| EmailJob
-    AutoResolveJob -->|enqueue, fire-and-forget| EmailJob
-    ClassifyJob --> LC
-    AutoResolveJob -->|1. retrieve top-K chunks| Pinecone
-    AutoResolveJob -->|2. grounded decide + draft| LC
-    IngestJob -->|read file| Storage
-    IngestJob --> LC
-    LC --> OpenAI
-    IngestJob -->|extract → chunk → embed → upsert| Pinecone
-    ClassifyJob --> DB
-    AutoResolveJob -->|reply + status| DB
-    IngestJob --> DB
-    EmailJob --> SES
 ```
+        browser (React client)
+                  |
+                  v   HTTPS + session cookie
+          Express API (routes)
+                  |
+      does this request only need
+           the database?
+                  |
+         +--------+--------+
+         |                 |
+        yes                no — also kick off a
+         |                 background job (the API
+         v                 responds right away,
+   read/write               never waits for these)
+   PostgreSQL                     |
+  (tickets, users,                v
+   replies, docs)        pg-boss job queue
+                          (just rows in the same
+                           Postgres database —
+                           no separate Redis/SQS)
+                                  |
+            +------------+-------+-------+------------+
+            |            |               |            |
+            v            v               v            v
+      classify-     auto-resolve-    ingest-       send-reply-
+      ticket job     ticket job    document job     email job
+            |            |               |            |
+            v            v               v            v
+        LangChain     LangChain       LangChain     AWS SES
+        + OpenAI      + Pinecone      + Pinecone     (deliver
+       (pick a        (search the    + S3/disk       the reply
+        category)      KB, maybe     (extract,        email)
+                        draft a       chunk, embed,
+                        reply)        store)
+```
+
+(The exact branching inside each of those four jobs — new → processing → resolved/open, chunk → embed → upsert, and so on — is broken out in its own simple diagram further down.)
 
 **Key decisions worth knowing about:**
 
@@ -420,6 +407,7 @@ cp packages/server/.env.example packages/server/.env
 | `BETTER_AUTH_SECRET`             | Signs/encrypts sessions and tokens                                                                    |
 | `BETTER_AUTH_URL`                | Base server URL, used for auth callbacks                                                              |
 | `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Initial admin account, used by `bun run seed`                                                         |
+| `AI_ASSISTANT_EMAIL`             | **Optional** — identifies the seeded AI Assistant bot account; defaults to `ai-assistant@deskwise.internal` |
 | `TRUSTED_ORIGINS`                | Comma-separated allowed CORS origins                                                                  |
 | `WEBHOOK_SECRET`                 | Shared secret for the inbound-email webhook                                                           |
 | `OPENAI_API_KEY`                 | Powers classification, summarize, polish, and embeddings                                              |
@@ -474,19 +462,25 @@ The client runs at `http://localhost:5173`, the API at `http://localhost:3000`.
 ```
 desky/
 ├── packages/
-│   ├── server/           # Express 5 API
-│   │   ├── routes/       # tickets, users, knowledge-docs
-│   │   ├── lib/          # tickets/ (AI features), knowledge-base/ (RAG pipeline)
-│   │   ├── jobs/         # pg-boss workers (classify-ticket, auto-resolve-ticket, ingest-document)
-│   │   ├── middleware/   # auth, rate limiting, error handling
-│   │   └── prisma/       # schema, migrations, seed scripts
-│   ├── client/           # React 19 SPA
-│   │   └── src/
-│   │       ├── pages/        # route-level views
-│   │       ├── components/   # tickets/, users/, knowledge-base/, ui/ (shadcn)
-│   │       └── hooks/
-│   └── core/             # shared Zod schemas + const-object enums
-└── screenshots/           # README screenshots
+│   ├── server/              # Express 5 API
+│   │   ├── routes/          # tickets, users, knowledge-docs
+│   │   ├── lib/              # tickets/ (AI features), knowledge-base/ (RAG pipeline)
+│   │   ├── jobs/             # pg-boss workers (classify-ticket, auto-resolve-ticket, ingest-document, send-reply-email)
+│   │   ├── middleware/       # auth, rate limiting, error handling
+│   │   ├── prisma/           # schema, migrations, seed scripts
+│   │   └── Dockerfile
+│   ├── client/               # React 19 SPA
+│   │   ├── src/
+│   │   │   ├── pages/          # route-level views
+│   │   │   ├── components/     # tickets/, users/, knowledge-base/, dashboard/, ui/ (shadcn)
+│   │   │   └── hooks/
+│   │   └── Dockerfile        # final stage is Caddy, not Node — see deskwise-deployment/
+│   └── core/                 # shared Zod schemas + const-object enums
+├── deskwise-deployment/     # deployment runbook, architecture diagrams, Lambda source,
+│                              and commented copies of every Docker/Compose file
+├── docker-compose.yml       # the real files docker-compose.yml/Caddyfile build from
+├── Caddyfile
+└── docs/screenshots/        # README screenshots
 ```
 
 ## Development Process
@@ -502,8 +496,9 @@ The goal wasn't "AI wrote this app" — it's using AI the way a competent engine
 ## Roadmap
 
 - ✍️ Agent-facing suggested-reply drafting (an AI-written first draft for a human to review, as opposed to polishing an agent's own draft or full auto-resolution)
-- 📧 Real email-provider ingestion (SendGrid/Mailgun inbound parse — currently a generic secret-gated JSON webhook)
-- 🐳 Docker + cloud deployment configuration
+- 🧵 Message/thread IDs for inbound email — today's dedupe (sender + subject + open-status) works, but a real `Message-ID` header is available and unused; would also let a reply to an already-open ticket append to the thread instead of just returning the existing ticket untouched
+- 🗄️ Managed database (RDS) instead of Postgres co-located in a container on the same instance — the current production setup has no automated backups
+- ⚙️ CI/CD automation — deployment today is a manual SSH + `docker compose up -d --build`, not push-to-deploy
 
 ## License
 
