@@ -74,7 +74,7 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 - Paginated, sortable, filterable ticket list (by subject, status, category)
 - Ticket detail view with a threaded reply history
 - Assignment to agents, status transitions (Open → Resolved → Closed)
-- Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates. In production this is fed by a real inbound email pipeline (AWS SES receipt rule → S3 → a small Lambda that parses the raw MIME and calls this same webhook), not just a manually-callable endpoint — see `deskwise-deployment/ARCHITECTURE.md`
+- Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates. The endpoint is secret-protected and works today for manual/test calls; a real AWS-native inbound pipeline in front of it (SES receipt rule → S3 → Lambda parsing the raw MIME) is planned but not yet built — see [Roadmap](#roadmap)
 - Outbound email sending via AWS SES — every agent reply and AI auto-resolution reply is emailed to the customer, off the request path via a pg-boss job
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
@@ -474,11 +474,10 @@ desky/
 │   │   │   ├── pages/          # route-level views
 │   │   │   ├── components/     # tickets/, users/, knowledge-base/, dashboard/, ui/ (shadcn)
 │   │   │   └── hooks/
-│   │   └── Dockerfile        # final stage is Caddy, not Node — see deskwise-deployment/
+│   │   └── Dockerfile        # final stage is Caddy, not Node
 │   └── core/                 # shared Zod schemas + const-object enums
-├── deskwise-deployment/     # deployment runbook, architecture diagrams, Lambda source,
-│                              and commented copies of every Docker/Compose file
-├── docker-compose.yml       # the real files docker-compose.yml/Caddyfile build from
+├── .github/workflows/       # CI (lint/build) + CD (build images, push to ECR, deploy to EC2)
+├── docker-compose.yml       # postgres + app + web (Caddy), the single-EC2 deploy target
 ├── Caddyfile
 └── docs/screenshots/        # README screenshots
 ```
@@ -497,8 +496,9 @@ The goal wasn't "AI wrote this app" — it's using AI the way a competent engine
 
 - ✍️ Agent-facing suggested-reply drafting (an AI-written first draft for a human to review, as opposed to polishing an agent's own draft or full auto-resolution)
 - 🧵 Message/thread IDs for inbound email — today's dedupe (sender + subject + open-status) works, but a real `Message-ID` header is available and unused; would also let a reply to an already-open ticket append to the thread instead of just returning the existing ticket untouched
+- 📬 Real inbound-email pipeline — `/api/tickets/inbound-email` only accepts manual/test calls today; wiring up an AWS SES receipt rule → S3 → Lambda in front of it (so real email actually reaches the app) hasn't been built yet
 - 🗄️ Managed database (RDS) instead of Postgres co-located in a container on the same instance — the current production setup has no automated backups
-- ⚙️ CI/CD automation — deployment today is a manual SSH + `docker compose up -d --build`, not push-to-deploy
+- 🏗️ Infrastructure as code (AWS CDK) for the OIDC provider, IAM deploy role, and ECR repos that CI/CD depends on — set up by hand for now
 
 ## License
 

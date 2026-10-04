@@ -1,0 +1,159 @@
+name: CI/CD
+
+on:
+   pull_request:
+   push:
+      branches: [master]
+
+# Only one deploy in flight at a time; a second push to master waits for the
+# first to finish rather than racing it on the same EC2 host.
+concurrency:
+   group: deskwise-deploy
+   cancel-in-progress: false
+
+jobs:
+   test:
+      name: Lint, typecheck & build
+      runs-on: ubuntu-latest
+      steps:
+         - uses: actions/checkout@v4
+
+         - uses: oven-sh/setup-bun@v2
+           with:
+              bun-version: latest
+
+         - run: bun install --frozen-lockfile
+
+         - name: Prettier check
+           # Scoped to exactly what the pre-commit lint-staged hook covers
+           # (see .lintstagedrc) — not a blanket `prettier --check .`, which
+           # would also flag README.md/CLAUDE.md/generated Prisma output
+           # that nothing has ever kept Prettier-formatted.
+           run: |
+              bunx prettier --check "**/*.{js,jsx,ts,tsx,css}" "!**/generated/**" \
+                 --ignore-path .gitignore \
+                 --ignore-path packages/server/.gitignore \
+                 --ignore-path packages/client/.gitignore
+
+         - name: Generate Prisma client
+           working-directory: packages/server
+           # prisma generate only reads the schema file, but still wants
+           # DATABASE_URL set or it warns; no real database needed here.
+           env:
+              DATABASE_URL: postgresql://user:pass@localhost:5432/db
+           run: bunx prisma generate
+
+         - name: Typecheck server
+           working-directory: packages/server
+           run: bun run typecheck
+
+         # Client lint is intentionally skipped here, not forgotten: `bun run
+         # lint` currently crashes outright because the installed
+         # typescript@7.0.2 isn't supported yet by typescript-eslint@8.67.0.
+         # Re-add this step once that's resolved (see README.md's Roadmap).
+         - name: Typecheck & build client
+           working-directory: packages/client
+           run: bun run build
+
+   deploy:
+      name: Build, push & deploy
+      needs: test
+      if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+      runs-on: ubuntu-latest
+      permissions:
+         id-token: write # required to mint the OIDC token for configure-aws-credentials
+         contents: read
+      env:
+         AWS_REGION: ${{ vars.AWS_REGION }}
+      steps:
+         - uses: actions/checkout@v4
+
+         - name: Configure AWS credentials (OIDC)
+           uses: aws-actions/configure-aws-credentials@v4
+           with:
+              role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+              aws-region: ${{ env.AWS_REGION }}
+
+         - name: Log in to Amazon ECR
+           id: ecr-login
+           uses: aws-actions/amazon-ecr-login@v2
+
+         - uses: docker/setup-buildx-action@v3
+
+         - name: Build & push server image
+           uses: docker/build-push-action@v6
+           with:
+              context: .
+              file: packages/server/Dockerfile
+              push: true
+              tags: |
+                 ${{ steps.ecr-login.outputs.registry }}/deskwise-server:${{ github.sha }}
+                 ${{ steps.ecr-login.outputs.registry }}/deskwise-server:latest
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+
+         - name: Build & push client image
+           uses: docker/build-push-action@v6
+           with:
+              context: .
+              file: packages/client/Dockerfile
+              push: true
+              build-args: |
+                 VITE_SENTRY_DSN=${{ secrets.VITE_SENTRY_DSN }}
+                 VITE_SENTRY_ENVIRONMENT=${{ vars.VITE_SENTRY_ENVIRONMENT }}
+              tags: |
+                 ${{ steps.ecr-login.outputs.registry }}/deskwise-client:${{ github.sha }}
+                 ${{ steps.ecr-login.outputs.registry }}/deskwise-client:latest
+              cache-from: type=gha
+              cache-to: type=gha,mode=max
+
+         - name: Deploy to EC2 via SSM
+           run: |
+              set -euo pipefail
+
+              # SSM commands are async by design: send-command hands back a
+              # CommandId immediately and runs /opt/deskwise/deploy.sh on
+              # the instance in the background — it does NOT wait for the
+              # script to finish or tell us whether it succeeded.
+              COMMAND_ID=$(aws ssm send-command \
+                 --instance-ids "${{ vars.EC2_INSTANCE_ID }}" \
+                 --document-name "AWS-RunShellScript" \
+                 --comment "deskwise deploy ${{ github.sha }}" \
+                 --parameters commands="[\"/opt/deskwise/deploy.sh ${{ github.sha }}\"]" \
+                 --query "Command.CommandId" --output text)
+
+              # So we block here until that CommandId reaches a terminal
+              # state (Success/Failed/TimedOut/...). `|| true`: this waiter
+              # itself exits non-zero on a Failed/TimedOut command, but we
+              # don't want THAT to trip `set -e` — we read the real outcome
+              # from get-command-invocation below and decide there instead.
+              aws ssm wait command-executed \
+                 --command-id "$COMMAND_ID" \
+                 --instance-id "${{ vars.EC2_INSTANCE_ID }}" || true
+
+              # get-command-invocation is the only way to read a command's
+              # result — its exit status and anything deploy.sh printed.
+              STATUS=$(aws ssm get-command-invocation \
+                 --command-id "$COMMAND_ID" \
+                 --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+                 --query "Status" --output text)
+
+              # Always show deploy.sh's stdout in the Actions log, pass or
+              # fail, so a successful deploy is just as inspectable as a
+              # failed one.
+              aws ssm get-command-invocation \
+                 --command-id "$COMMAND_ID" \
+                 --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+                 --query "StandardOutputContent" --output text
+
+              # Only now do we actually fail the GitHub Actions job — the
+              # SSM API call above having succeeded just means "AWS agreed
+              # to run the script," not "the script worked."
+              if [ "$STATUS" != "Success" ]; then
+                 echo "Deploy command finished with status: $STATUS" >&2
+                 aws ssm get-command-invocation \
+                    --command-id "$COMMAND_ID" \
+                    --instance-id "${{ vars.EC2_INSTANCE_ID }}" \
+                    --query "StandardErrorContent" --output text >&2
+                 exit 1
+              fi

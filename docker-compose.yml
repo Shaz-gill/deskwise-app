@@ -11,6 +11,12 @@ services:
       networks: [internal]
 
    app:
+      # `image:` lets CD skip the build entirely and just pull what CI already
+      # built and pushed (see .github/workflows/) — `docker compose pull && up
+      # -d`, no source checkout needed on the host. `build:` stays alongside
+      # it purely so `docker compose build` still works for a manual/local
+      # deploy with no CI involved; it's unused by the normal CD path.
+      image: ${ECR_REGISTRY}/deskwise-server:${IMAGE_TAG:-latest}
       build:
          context: .
          dockerfile: packages/server/Dockerfile
@@ -24,6 +30,10 @@ services:
       networks: [internal]
 
    web:
+      # Same build/image split as `app` above — VITE_* args only matter for
+      # the local `build:` path, since CI bakes them in when it builds the
+      # pushed image.
+      image: ${ECR_REGISTRY}/deskwise-client:${IMAGE_TAG:-latest}
       build:
          context: .
          dockerfile: packages/client/Dockerfile
