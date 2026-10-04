@@ -47,17 +47,17 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
          // this job runs — nothing to do.
          if (!ticket || ticket.status !== TicketStatus.new) return;
 
-         const aiUser = await getAiAssistantUser();
-
          // Guarded new -> processing transition: if this races with
          // something else (shouldn't happen in practice, since a ticket
          // only ever gets one auto-resolve job), count === 0 and we back
-         // off rather than double-processing. Also assigns the ticket to
-         // AI Assistant so it reads as "owned" while being worked; handed
-         // back to null (unassigned) below on any fallback-to-open path.
+         // off rather than double-processing. Deliberately doesn't depend
+         // on getAiAssistantUser() (fetched below, inside the try) — the
+         // claim must succeed *before* anything that can throw, so that
+         // the try/catch's fallback-to-open always has a 'processing'
+         // ticket to act on, never a 'new' one it can't reach.
          const { count: claimed } = await prisma.ticket.updateMany({
             where: { id: ticketId, status: TicketStatus.new },
-            data: { status: TicketStatus.processing, assignedToId: aiUser.id },
+            data: { status: TicketStatus.processing },
          });
          if (claimed === 0) return;
 
@@ -69,8 +69,18 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
          // stuck in an internal, hidden-from-the-UI state forever. Always
          // fall back to 'open' on any failure so the ticket surfaces to a
          // human no matter what breaks (missing/misconfigured Pinecone
-         // index, OpenAI error, etc).
+         // index, OpenAI error, a misconfigured AI_ASSISTANT_EMAIL, etc).
          try {
+            const aiUser = await getAiAssistantUser();
+
+            // Assigns the ticket to AI Assistant so it reads as "owned"
+            // while being worked; handed back to null (unassigned) below
+            // on any fallback-to-open path.
+            await prisma.ticket.updateMany({
+               where: { id: ticketId, status: TicketStatus.processing },
+               data: { assignedToId: aiUser.id },
+            });
+
             const readyDocCount = await prisma.knowledgeDoc.count({
                where: { status: KnowledgeDocStatus.ready },
             });

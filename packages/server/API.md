@@ -115,6 +115,14 @@ All routes require a signed-in session except the inbound-email webhook, which i
 curl -s -b cookies.txt "$BASE_URL/api/tickets?sortBy=createdAt&sortOrder=desc&status=open&category=&subject=&page=1&pageSize=15"
 ```
 
+### Dashboard stats
+
+Org-wide summary backing the `/` dashboard (total/open counts, a 30-day daily ticket-count series, AI-auto-resolved rate, category breakdown, and open-ticket workload per assignee). No request body or params.
+
+```bash
+curl -s -b cookies.txt "$BASE_URL/api/tickets/stats"
+```
+
 ### Get a single ticket (with its replies)
 
 ```bash
@@ -136,6 +144,8 @@ curl -s -b cookies.txt -X PATCH "$BASE_URL/api/tickets/<ticket-id>" \
 ```
 
 ### Add a reply to a ticket
+
+Enqueues an outbound email to the ticket's `senderEmail` via SES (`jobs/send-reply-email-job.ts`) — sent async, doesn't block this response. No-ops (logs only) if `AWS_REGION`/`SES_FROM_EMAIL` are unset; see root `AWS_SETUP.md`.
 
 ```bash
 curl -s -b cookies.txt -X POST "$BASE_URL/api/tickets/<ticket-id>/replies" \
@@ -195,7 +205,7 @@ curl -s -b cookies.txt "$BASE_URL/api/knowledge-docs"
 
 ### Upload a document
 
-Behind `knowledgeUploadLimiter` (10 req / 15 min). Multipart upload, field name `file`; only `.pdf`/`.docx`/`.txt`/`.md` are accepted (checked by extension, not the browser-supplied content type), max 20MB. Returns immediately — extraction/chunking/embedding/upsert into Pinecone happens asynchronously.
+Behind `knowledgeUploadLimiter` (10 req / 15 min). Multipart upload, field name `file`; only `.pdf`/`.docx`/`.txt`/`.md` are accepted (checked by extension, not the browser-supplied content type), max 20MB. Returns immediately — extraction/chunking/embedding/upsert into Pinecone happens asynchronously. Stored in S3 if `KNOWLEDGE_BASE_S3_BUCKET` is set, otherwise local disk at `/knowledge-base`; see root `AWS_SETUP.md`.
 
 ```bash
 curl -s -b cookies.txt -X POST "$BASE_URL/api/knowledge-docs" \
