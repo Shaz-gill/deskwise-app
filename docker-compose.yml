@@ -1,0 +1,52 @@
+services:
+   postgres:
+      image: postgres:16-alpine
+      restart: unless-stopped
+      environment:
+         POSTGRES_USER: ${POSTGRES_USER}
+         POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+         POSTGRES_DB: ${POSTGRES_DB}
+      volumes:
+         - pgdata:/var/lib/postgresql/data
+      networks: [internal]
+
+   app:
+      build:
+         context: .
+         dockerfile: packages/server/Dockerfile
+      restart: unless-stopped
+      env_file: .env
+      environment:
+         NODE_ENV: production
+         PORT: 3000
+      depends_on:
+         - postgres
+      networks: [internal]
+
+   web:
+      build:
+         context: .
+         dockerfile: packages/client/Dockerfile
+         args:
+            VITE_SENTRY_DSN: ${VITE_SENTRY_DSN}
+            VITE_SENTRY_ENVIRONMENT: ${VITE_SENTRY_ENVIRONMENT}
+      restart: unless-stopped
+      environment:
+         APP_DOMAIN: ${APP_DOMAIN}
+      ports:
+         - '80:80'
+         - '443:443'
+      depends_on:
+         - app
+      networks: [internal]
+      volumes:
+         - caddy_data:/data
+         - caddy_config:/config
+
+networks:
+   internal:
+
+volumes:
+   pgdata:
+   caddy_data:
+   caddy_config:

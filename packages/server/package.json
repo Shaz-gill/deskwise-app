@@ -6,6 +6,7 @@
    "scripts": {
       "start": "NODE_ENV=development bun run index.ts",
       "dev": "NODE_ENV=development bun --watch run index.ts",
+      "start:prod": "bun run index.ts",
       "seed": "bun run prisma/scripts/seed.ts",
       "seed:users": "bun run prisma/scripts/seed-users.ts",
       "seed:tickets": "bun run prisma/scripts/seed-tickets.ts",

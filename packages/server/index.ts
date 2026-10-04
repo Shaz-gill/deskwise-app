@@ -26,6 +26,14 @@ import { registerSendReplyEmailWorker } from './jobs/send-reply-email-job';
 const app = express();
 const port = process.env.PORT || 3000;
 
+// Behind Caddy in production (docker-compose.yml), req.ip and req.protocol
+// otherwise reflect the proxy, not the real client — breaking
+// express-rate-limit's per-IP buckets and Better Auth's secure-cookie
+// detection. Not set in local dev, where there's no reverse proxy.
+if (process.env.NODE_ENV === 'production') {
+   app.set('trust proxy', 1);
+}
+
 // ── Global middleware ────────────────────────────────────────────────────
 app.use(helmet());
 app.use(

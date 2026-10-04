@@ -1,0 +1,19 @@
+# {$APP_DOMAIN} is interpolated from the `web` service's APP_DOMAIN env var
+# (see docker-compose.yml) — Caddy requests/renews its TLS cert for exactly
+# that hostname automatically, so DNS must already point at this host before
+# the container starts or the ACME challenge fails.
+{$APP_DOMAIN} {
+	encode gzip
+
+	# Better Auth's handler, and the rest of the JSON API, stay same-origin
+	# behind this one domain — no CORS/cookie cross-site complications.
+	handle /api/* {
+		reverse_proxy app:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}

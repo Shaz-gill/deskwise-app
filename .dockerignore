@@ -1,0 +1,11 @@
+node_modules
+**/node_modules
+.git
+**/dist
+**/generated
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.*.example
+/knowledge-base
+AWS_SETUP.md
