@@ -1,6 +1,8 @@
+import { render } from '@react-email/render';
 import type { Job } from 'pg-boss';
 import prisma from '../db';
 import { sendEmail } from '../lib/email/send-email';
+import { ReplyEmail } from '../lib/email/templates/reply-email';
 import { boss } from '../lib/queue';
 import { Sentry } from '../lib/sentry';
 
@@ -49,12 +51,21 @@ export async function registerSendReplyEmailWorker(): Promise<void> {
             // nothing to send.
             if (!reply) return;
 
+            const subject = `Re: ${reply.ticket.subject}`;
+
             await sendEmail({
                to: reply.ticket.senderEmail,
                toName: reply.ticket.senderName,
-               subject: `Re: ${reply.ticket.subject}`,
+               subject,
                text: reply.body,
-               html: reply.bodyHtml,
+               html: reply.bodyHtml
+                  ? await render(
+                       <ReplyEmail
+                          subject={subject}
+                          bodyHtml={reply.bodyHtml}
+                       />
+                    )
+                  : null,
             });
          } catch (err) {
             // Reported here, then rethrown so pg-boss still owns

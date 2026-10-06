@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginFormValues } from 'core';
+import { KeyRound, Mail } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -72,6 +73,19 @@ export function LoginPage() {
                </CardDescription>
             </CardHeader>
             <CardContent>
+               <div className="mb-4 rounded-md border border-border/70 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
+                  <p className="font-medium text-foreground">
+                     Demo credentials
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                     <Mail className="size-3.5" />
+                     <span className="font-mono">admin@deskwise.com</span>
+                  </p>
+                  <p className="flex items-center gap-1.5">
+                     <KeyRound className="size-3.5" />
+                     <span className="font-mono">password123</span>
+                  </p>
+               </div>
                <form onSubmit={handleSubmit(onSubmit)} noValidate>
                   <FieldGroup>
                      {serverError && (
