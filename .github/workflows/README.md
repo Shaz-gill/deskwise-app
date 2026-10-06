@@ -18,8 +18,19 @@ on the roadmap); until then, this doc is the only record of how it's wired,
 so keep it in sync if you change any ARN, repo name, or script by hand on the
 box.
 
-This account/repo's concrete values, filled in below wherever the steps used
-to say `<ACCOUNT_ID>` / `<REGION>` / `<GITHUB_ORG>/<REPO>`:
+## Status
+
+**Confirmed working end-to-end as of 2026-10-07.** A push to `master` runs
+`test` → `deploy`, which builds both images, pushes them to ECR, and the SSM
+command successfully pulls and restarts `app`/`web` on the instance —
+verified via `docker ps` on the instance showing the ECR-tagged images
+running, not the old locally-built ones. All 6 setup steps below are done
+for this account/repo.
+
+## This account's values
+
+Filled in below wherever the steps say `<ACCOUNT_ID>` / `<REGION>` /
+`<GITHUB_ORG>/<REPO>` / `<INSTANCE_ID>`:
 
 - Account ID: `798256686602`
 - Region: `ap-southeast-2`
@@ -29,32 +40,51 @@ to say `<ACCOUNT_ID>` / `<REGION>` / `<GITHUB_ORG>/<REPO>`:
   rotates)
 - GitHub Actions deploy role ARN: `arn:aws:iam::798256686602:role/deskwise-deploy`
 
-**Important deviation from step 5 below:** this instance already had the app
+**Deviation from step 5's instructions:** this instance already had the app
 manually deployed at `/home/ec2-user/deskwise-app/` (a full git checkout,
 `docker compose up` run directly from there) _before_ CI/CD was set up —
 `docker ps` showed live, 2-day-old containers with real Postgres data.
-Rather than migrate that to `/opt/deskwise/` (which risks orphaning the
-Postgres volume, since Compose ties default volume names to the project
-directory), `/opt/deskwise/deploy.sh` was pointed at the existing directory
-instead. So: **the deploy script lives at `/opt/deskwise/deploy.sh`, but
-`cd`s into `/home/ec2-user/deskwise-app`, which is also where the real
-`.env` and `docker-compose.yml` live** — not `/opt/deskwise/` as originally
-written below. Keep this in sync if that ever changes.
+Migrating that to `/opt/deskwise/` would have risked orphaning the Postgres
+volume (Compose ties default volume names to the project directory it runs
+from), so instead `/opt/deskwise/deploy.sh` was pointed at the existing
+directory. Net result: **the deploy script lives at
+`/opt/deskwise/deploy.sh`, but `cd`s into `/home/ec2-user/deskwise-app`**,
+which is also where the real `.env` and `docker-compose.yml` live — not
+`/opt/deskwise/` as step 5 originally assumed. Keep this in sync if that
+ever changes.
 
-Progress on this account, as of 2026-10-06:
+## Setup checklist
 
 - [x] Step 1 — OIDC provider already existed on this account
 - [x] Step 2 — IAM role created (named `deskwise-deploy`); trust policy
-      required the `@ID`-suffixed `sub` pattern below, not the plain one —
-      see the gotcha note under step 2
+      needed the `@ID`-suffixed `sub` pattern, not the plain one — see
+      step 2's gotcha note
 - [x] Step 3 — ECR repos created
 - [x] Step 4 — EC2 instance role updated (SSM + ECR-read attached to
       `deskwise-ec2-role`; confirmed instance shows Online in Fleet Manager)
 - [x] Step 5 — deploy script placed at `/opt/deskwise/deploy.sh`, pointed at
-      the real app directory per the note above; `ECR_REGISTRY`/`IMAGE_TAG`
-      added to the existing `~/deskwise-app/.env`
+      the real app directory per the deviation note above;
+      `ECR_REGISTRY`/`IMAGE_TAG` added to the existing `~/deskwise-app/.env`
 - [x] Step 6 — GitHub secrets/variables set (`VITE_SENTRY_*` deliberately
-      skipped, see step 6 below)
+      skipped, see step 6)
+
+## Gotchas index
+
+Three real issues came up getting this working on this account. Each is
+documented in full at its relevant step (exact error text, root cause, fix
+commands) — this is just the index so a future read doesn't have to hunt:
+
+1. **OIDC trust policy `sub` format** (step 2) — GitHub embeds immutable
+   numeric IDs in the `sub` claim now; the plain `repo:OWNER/REPO:...`
+   pattern alone gets `AccessDenied`.
+2. **`.env` must be valid bash, not just `KEY=VALUE`** (step 5) —
+   `deploy.sh` does `source .env`, so any value containing a space (e.g. a
+   display name like `Customer Support`) must be double-quoted or bash
+   misparses the line as a command.
+3. **`docker compose` plugin was only installed per-user, not system-wide**
+   (step 5) — it lived in `~/.docker/cli-plugins/` (visible to `ec2-user`
+   only), but SSM runs commands as root, which couldn't see it. Fixed by
+   copying the plugin binary to `/usr/libexec/docker/cli-plugins/`.
 
 ## 1. GitHub OIDC identity provider (once per AWS account) — done
 
@@ -74,7 +104,7 @@ aws iam create-open-id-connect-provider \
 type **OpenID Connect** → Provider URL `https://token.actions.githubusercontent.com`
 (click **Get thumbprint**) → Audience `sts.amazonaws.com` → Add provider.
 
-## 2. IAM role GitHub Actions assumes
+## 2. IAM role GitHub Actions assumes — done (`deskwise-deploy`)
 
 Trust policy — scoped to this repo's `master` branch only, since that's the
 only ref the `deploy` job ever runs on:
@@ -200,16 +230,16 @@ aws iam get-role --role-name deskwise-deploy \
 7. Role name: `deskwise-deploy`.
 8. **Create role**, then click into the new role from the Roles list.
 9. **Trust relationships** tab → **Edit trust policy**.
-10.   Delete the contents and paste the trust policy JSON above.
-11.   **Update policy**.
-12.   **Permissions** tab → **Add permissions** dropdown → **Create inline policy**.
-13.   Click the **JSON** tab in the policy editor → paste the permissions
-      policy JSON above.
-14.   **Next** → name it `deskwise-deploy-permissions` → **Create policy**.
-15.   Back on the role's **Summary** page, copy the **ARN** — that's the
-      `AWS_DEPLOY_ROLE_ARN` secret for step 6.
+10. Delete the contents and paste the trust policy JSON above.
+11. **Update policy**.
+12. **Permissions** tab → **Add permissions** dropdown → **Create inline policy**.
+13. Click the **JSON** tab in the policy editor → paste the permissions
+    policy JSON above.
+14. **Next** → name it `deskwise-deploy-permissions` → **Create policy**.
+15. Back on the role's **Summary** page, copy the **ARN** — that's the
+    `AWS_DEPLOY_ROLE_ARN` secret for step 6.
 
-## 3. ECR repositories
+## 3. ECR repositories — done
 
 ```bash
 aws ecr create-repository --repository-name deskwise-server --region ap-southeast-2
@@ -225,7 +255,7 @@ aws ecr create-repository --repository-name deskwise-client --region ap-southeas
 4. Leave the rest default → **Create repository**.
 5. **Create repository** again, name `deskwise-client`, same settings.
 
-## 4. EC2 instance role additions
+## 4. EC2 instance role additions — done
 
 The instance already has an IAM role for SES + S3 (see root `CLAUDE.md`).
 Add to that same role:
@@ -274,7 +304,7 @@ compose pull` on the host actually read from ECR.
    instance has no outbound network path, a separate problem from the IAM
    permissions above.
 
-## 5. The deploy script on the host
+## 5. The deploy script on the host — done
 
 This lives only on the EC2 instance, not in this repo (same reasoning as the
 `.env` file it reads) — create it once at `/opt/deskwise/deploy.sh`,
@@ -327,14 +357,47 @@ docker image prune -f
    above) and make sure it has `ECR_REGISTRY=<account>.dkr.ecr.<region>.amazonaws.com`
    and `AWS_REGION` set.
 
-**Before this works end-to-end for the first time:** the very first
-`docker compose pull` will only succeed once GitHub Actions has actually
-pushed images tagged `deskwise-server`/`deskwise-client` to ECR at least
-once — i.e. after step 6 is done and a push to `master` runs the `deploy`
-job successfully. Until then, running `deploy.sh` by hand will fail to pull
-(nothing's been pushed yet) — that's expected, not a bug in the script.
+**General note for any future from-scratch setup:** the very first
+`docker compose pull` only succeeds once GitHub Actions has actually pushed
+images tagged `deskwise-server`/`deskwise-client` to ECR at least once —
+i.e. after step 6 is done and a push to `master` runs `deploy` successfully.
+Before that, running `deploy.sh` by hand fails to pull (nothing's been
+pushed yet) — expected, not a bug in the script. (Already crossed on this
+account — see Status at the top.)
 
-## 6. GitHub repo secrets & variables
+**Gotcha #1 hit on this account — `.env` must be valid bash, not just
+`KEY=VALUE`:** `deploy.sh` does `source .env` to get `AWS_REGION`/
+`ECR_REGISTRY` as real shell variables for the `docker login` line. That
+means bash parses the *entire* file, not just those two lines — so any
+value containing a space (e.g. `SES_FROM_NAME=Customer Support`) breaks
+with an error like `.env: line 31: Customer: command not found`, because
+bash treats the text after the space as a separate command to run. Fix: wrap
+any such value in double quotes, e.g. `SES_FROM_NAME="Customer Support"`.
+To check for other lines with this problem without printing secret values:
+```bash
+awk -F'=' '!/^#/ && NF>1 && $0 ~ / / {print NR": "$1}' ~/deskwise-app/.env
+```
+and to verify the whole file is valid bash after fixing (prints `OK`, no
+secrets shown):
+```bash
+bash -c "set -a; source ~/deskwise-app/.env; set +a; echo OK"
+```
+
+**Gotcha #2 hit on this account — `docker compose` plugin installed
+per-user, not system-wide:** the `deploy` job triggers this script via SSM,
+which runs commands as **root** — but `docker compose` (the Compose v2
+plugin) had only been installed into `/home/ec2-user/.docker/cli-plugins/`,
+which only `ec2-user` can see. Running the script manually over SSH (as
+`ec2-user`) worked fine; running it via SSM failed with
+`docker: 'compose' is not a docker command.` Fix: copy the plugin binary to
+the system-wide location so every user (root included) can see it:
+```bash
+sudo cp ~/.docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
+sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+sudo docker compose version   # should now print the version, confirming the fix
+```
+
+## 6. GitHub repo secrets & variables — done
 
 Settings → Secrets and variables → Actions:
 

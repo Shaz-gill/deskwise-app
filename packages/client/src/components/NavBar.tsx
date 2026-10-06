@@ -148,7 +148,7 @@ export function NavBar() {
                            className="whitespace-nowrap"
                         >
                            <BookOpenIcon />
-                           Knowledge Base
+                           Knowledge Bases
                         </DropdownMenuItem>
                      )}
                      <DropdownMenuItem
