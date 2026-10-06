@@ -1,6 +1,6 @@
 # CI/CD setup
 
-`ci-cd.yml` has two jobs:
+`deploy.yml` has two jobs:
 
 - **test** (every PR and every push to `master`): `bun install`, a Prettier
   format check, `prisma generate` + `tsc --noEmit` for the server, and
@@ -20,12 +20,16 @@ box.
 
 ## Status
 
-**Confirmed working end-to-end as of 2026-10-07.** A push to `master` runs
-`test` → `deploy`, which builds both images, pushes them to ECR, and the SSM
-command successfully pulls and restarts `app`/`web` on the instance —
-verified via `docker ps` on the instance showing the ECR-tagged images
-running, not the old locally-built ones. All 6 setup steps below are done
-for this account/repo.
+**Confirmed working end-to-end as of 2026-10-07**, including a real
+client-side code change actually reaching production — not just the
+pipeline going green. A push to `master` runs `test` → `deploy`, which
+builds both images, pushes them to ECR, and the SSM command pulls and
+restarts `app`/`web` on the instance, verified via `docker ps` showing the
+ECR-tagged images running with fresh timestamps. All 6 setup steps below are
+done for this account/repo. Getting from "pipeline reports success" to
+"change is actually live" took two more rounds of debugging past the
+original 6-step setup — see gotchas #4 and #5 below; those were the ones
+that let `deploy` report `Success` while silently deploying nothing.
 
 ## This account's values
 
@@ -64,15 +68,18 @@ ever changes.
       `deskwise-ec2-role`; confirmed instance shows Online in Fleet Manager)
 - [x] Step 5 — deploy script placed at `/opt/deskwise/deploy.sh`, pointed at
       the real app directory per the deviation note above;
-      `ECR_REGISTRY`/`IMAGE_TAG` added to the existing `~/deskwise-app/.env`
+      `ECR_REGISTRY`/`IMAGE_TAG` added to the existing `~/deskwise-app/.env`;
+      `git pull` added as its first line after gotcha #4 (see step 5)
 - [x] Step 6 — GitHub secrets/variables set (`VITE_SENTRY_*` deliberately
       skipped, see step 6)
 
 ## Gotchas index
 
-Three real issues came up getting this working on this account. Each is
+Five real issues came up getting this working on this account. Each is
 documented in full at its relevant step (exact error text, root cause, fix
-commands) — this is just the index so a future read doesn't have to hunt:
+commands) — this is just the index so a future read doesn't have to hunt.
+**#4 is the one most likely to bite again** — read it even if you skip the
+rest:
 
 1. **OIDC trust policy `sub` format** (step 2) — GitHub embeds immutable
    numeric IDs in the `sub` claim now; the plain `repo:OWNER/REPO:...`
@@ -85,6 +92,23 @@ commands) — this is just the index so a future read doesn't have to hunt:
    (step 5) — it lived in `~/.docker/cli-plugins/` (visible to `ec2-user`
    only), but SSM runs commands as root, which couldn't see it. Fixed by
    copying the plugin binary to `/usr/libexec/docker/cli-plugins/`.
+4. **The host's `docker-compose.yml` was a stale git checkout and silently
+   caused every deploy to do nothing** (step 5) — `~/deskwise-app` was
+   cloned once, before the `image:` field existed in this file, and never
+   updated. `docker compose pull` had no `image:` to pull (compose just
+   skips such services, no error), so `up -d` kept reusing the original
+   locally-built image forever. The `deploy` job still reported `Success`
+   throughout, because the script itself ran without error — it just never
+   deployed anything. Fixed by adding `git pull` as the first thing
+   `deploy.sh` does, so this can't go stale again.
+5. **EC2 instance role was missing two ECR actions needed to actually pull
+   image layers** (step 4) — `deskwise-ecr-read` only had
+   `GetAuthorizationToken` (enough to `docker login`) and `BatchGetImage`
+   (enough to read the manifest), but not `BatchCheckLayerAvailability` or
+   `GetDownloadUrlForLayer` — so `docker compose pull` got as far as
+   resolving the image before failing with `AccessDenied` on the actual
+   layer download. This one only surfaced once gotcha #4 was fixed and a
+   real pull was attempted for the first time.
 
 ## 1. GitHub OIDC identity provider (once per AWS account) — done
 
@@ -263,9 +287,13 @@ Add to that same role:
 - `AmazonSSMManagedInstanceCore` (AWS managed policy) — lets SSM reach the
   box at all. Most current AMIs ship the SSM agent already running; confirm
   the instance shows up in `aws ssm describe-instance-information`.
-- Inline permission for `ecr:GetAuthorizationToken` and `ecr:BatchGetImage`
-  on the two repo ARNs above — this is what lets `docker login`/`docker
-compose pull` on the host actually read from ECR.
+- Inline permission for `ecr:GetAuthorizationToken`,
+  `ecr:BatchCheckLayerAvailability`, `ecr:GetDownloadUrlForLayer`, and
+  `ecr:BatchGetImage` on the two repo ARNs above — all four are needed for
+  `docker login`/`docker compose pull` on the host to actually read from
+  ECR (see gotcha #5 below — the first two alone get you far enough to
+  resolve the image manifest, but pulling the actual layers needs the other
+  two).
 
 **Console steps:**
 
@@ -288,7 +316,11 @@ compose pull` on the host actually read from ECR.
       },
       {
          "Effect": "Allow",
-         "Action": "ecr:BatchGetImage",
+         "Action": [
+            "ecr:BatchCheckLayerAvailability",
+            "ecr:GetDownloadUrlForLayer",
+            "ecr:BatchGetImage"
+         ],
          "Resource": [
             "arn:aws:ecr:ap-southeast-2:798256686602:repository/deskwise-server",
             "arn:aws:ecr:ap-southeast-2:798256686602:repository/deskwise-client"
@@ -318,6 +350,13 @@ instead:
 #!/bin/bash
 set -euo pipefail
 cd /home/ec2-user/deskwise-app
+
+# Keeps docker-compose.yml (and anything else this directory needs) in sync
+# with the repo on every deploy — see gotcha #4 below for why this line
+# exists at all. Safe here because this repo is public over HTTPS, so it
+# never prompts for credentials; a private repo would need a deploy key
+# instead, or this would hang an unattended SSM run.
+git pull
 
 # docker compose itself auto-loads .env for ${VAR} interpolation, but these
 # two also need to be plain shell vars for the `docker login` line below.
@@ -365,7 +404,7 @@ Before that, running `deploy.sh` by hand fails to pull (nothing's been
 pushed yet) — expected, not a bug in the script. (Already crossed on this
 account — see Status at the top.)
 
-**Gotcha #1 hit on this account — `.env` must be valid bash, not just
+**Gotcha #2 hit on this account — `.env` must be valid bash, not just
 `KEY=VALUE`:** `deploy.sh` does `source .env` to get `AWS_REGION`/
 `ECR_REGISTRY` as real shell variables for the `docker login` line. That
 means bash parses the *entire* file, not just those two lines — so any
@@ -383,7 +422,7 @@ secrets shown):
 bash -c "set -a; source ~/deskwise-app/.env; set +a; echo OK"
 ```
 
-**Gotcha #2 hit on this account — `docker compose` plugin installed
+**Gotcha #3 hit on this account — `docker compose` plugin installed
 per-user, not system-wide:** the `deploy` job triggers this script via SSM,
 which runs commands as **root** — but `docker compose` (the Compose v2
 plugin) had only been installed into `/home/ec2-user/.docker/cli-plugins/`,
@@ -395,6 +434,60 @@ the system-wide location so every user (root included) can see it:
 sudo cp ~/.docker/cli-plugins/docker-compose /usr/libexec/docker/cli-plugins/docker-compose
 sudo chmod +x /usr/libexec/docker/cli-plugins/docker-compose
 sudo docker compose version   # should now print the version, confirming the fix
+```
+
+**Gotcha #4 hit on this account — the host's `docker-compose.yml` was stale
+and every deploy silently did nothing:** `~/deskwise-app` was `git clone`d
+once, on day one, before this project's `docker-compose.yml` had `image:`
+fields at all (it only had `build:` back then). Nobody ever ran `git pull`
+on the host afterward, so it stayed frozen at that old commit indefinitely.
+Symptom: `deploy` kept reporting `Success` in GitHub Actions, real images
+kept getting built and pushed to ECR, but `docker ps` on the instance always
+showed the same old locally-built image names (`deskwise-app-app`,
+`deskwise-app-web`) with ancient `CREATED` timestamps — `docker compose
+pull app web` had no `image:` key to pull on either service, so it silently
+skipped them (`Skipped No image to be pulled`, not an error), and `up -d`
+just kept the already-running old container since nothing told it to
+rebuild. The only reason this got noticed at all was a client-side change
+not showing up on the live site.
+Fix: added `git pull` as the first line of `deploy.sh` (above), so the
+host's checkout can never drift from the repo again. Confirm it's safe for
+your repo before relying on this — a public repo over HTTPS needs no
+credentials and `git pull` just works; a private repo would hang waiting
+for a username/password on an unattended SSM run unless a deploy key or
+cached credential helper is set up first. Test with a plain
+`cd ~/deskwise-app && git pull` over SSH; if that prompts for anything,
+don't add the line to `deploy.sh` until that's sorted.
+One-time recovery used on this account, for reference (don't need to repeat
+this now that `git pull` is in the script):
+```bash
+cd ~/deskwise-app
+git checkout -- docker-compose.yml   # discard the stale uncommitted copy
+git pull                             # bring in the real, current file
+sudo /opt/deskwise/deploy.sh latest  # force an immediate redeploy
+```
+
+**Gotcha #5 hit on this account — EC2 instance role missing two ECR
+actions:** once gotcha #4 was fixed and `docker compose pull` finally had a
+real `image:` to resolve, it failed with:
+```
+error pulling image configuration: download failed after attempts=1: denied:
+... is not authorized to perform: ecr:GetDownloadUrlForLayer on resource:
+arn:aws:ecr:ap-southeast-2:798256686602:repository/deskwise-client because
+no identity-based policy allows the ecr:GetDownloadUrlForLayer action
+```
+`deskwise-ecr-read` (step 4) only granted `GetAuthorizationToken` and
+`BatchGetImage` — enough to log in and resolve the image manifest, but not
+enough to actually download the layer blobs. Fixed by adding
+`ecr:BatchCheckLayerAvailability` and `ecr:GetDownloadUrlForLayer` to that
+same inline policy (the JSON in step 4 above already reflects the fix).
+Updated from a local machine authenticated as an IAM admin user (the EC2
+instance's own role can't modify its own IAM policy):
+```bash
+aws iam put-role-policy \
+  --role-name deskwise-ec2-role \
+  --policy-name deskwise-ecr-read \
+  --policy-document file://ecr-read-policy.json   # the step-4 JSON above
 ```
 
 ## 6. GitHub repo secrets & variables — done
@@ -410,7 +503,7 @@ Settings → Secrets and variables → Actions:
 | `VITE_SENTRY_ENVIRONMENT` | variable | _(skipped for now, see below)_                   |
 
 **`VITE_SENTRY_DSN`/`VITE_SENTRY_ENVIRONMENT` deliberately left unset** —
-they're only used as client Docker build-args (`ci-cd.yml` lines 102-103);
+they're only used as client Docker build-args (`deploy.yml` lines 102-103);
 left unset, GitHub passes empty strings, the build still succeeds, and
 `Sentry.init()` just no-ops client-side with no DSN, same as local dev with
 none configured. Add them later if/when Sentry gets wired up for real.
