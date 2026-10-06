@@ -33,7 +33,7 @@ to say `<ACCOUNT_ID>` / `<REGION>` / `<GITHUB_ORG>/<REPO>`:
 
 **Important deviation from step 5 below:** this instance already had the app
 manually deployed at `/home/ec2-user/deskwise-app/` (a full git checkout,
-`docker compose up` run directly from there) *before* CI/CD was set up —
+`docker compose up` run directly from there) _before_ CI/CD was set up —
 `docker ps` showed live, 2-day-old containers with real Postgres data.
 Rather than migrate that to `/opt/deskwise/` (which risks orphaning the
 Postgres volume, since Compose ties default volume names to the project
@@ -183,14 +183,14 @@ aws iam get-role --role-name deskwise-github-actions-deploy \
 7. Role name: `deskwise-github-actions-deploy`.
 8. **Create role**, then click into the new role from the Roles list.
 9. **Trust relationships** tab → **Edit trust policy**.
-10. Delete the contents and paste the trust policy JSON above.
-11. **Update policy**.
-12. **Permissions** tab → **Add permissions** dropdown → **Create inline policy**.
-13. Click the **JSON** tab in the policy editor → paste the permissions
-    policy JSON above (with `<INSTANCE_ID>` replaced by the real instance ID).
-14. **Next** → name it `deskwise-deploy-permissions` → **Create policy**.
-15. Back on the role's **Summary** page, copy the **ARN** — that's the
-    `AWS_DEPLOY_ROLE_ARN` secret for step 6.
+10.   Delete the contents and paste the trust policy JSON above.
+11.   **Update policy**.
+12.   **Permissions** tab → **Add permissions** dropdown → **Create inline policy**.
+13.   Click the **JSON** tab in the policy editor → paste the permissions
+      policy JSON above (with `<INSTANCE_ID>` replaced by the real instance ID).
+14.   **Next** → name it `deskwise-deploy-permissions` → **Create policy**.
+15.   Back on the role's **Summary** page, copy the **ARN** — that's the
+      `AWS_DEPLOY_ROLE_ARN` secret for step 6.
 
 ## 3. ECR repositories
 
@@ -321,13 +321,13 @@ job successfully. Until then, running `deploy.sh` by hand will fail to pull
 
 Settings → Secrets and variables → Actions:
 
-| Name                       | Kind     | Value                                                            |
-| -------------------------- | -------- | ----------------------------------------------------------------- |
-| `AWS_DEPLOY_ROLE_ARN`      | secret   | `arn:aws:iam::798256686602:role/deskwise-deploy`                   |
-| `VITE_SENTRY_DSN`          | secret   | *(skipped for now, see below)*                                     |
-| `AWS_REGION`               | variable | `ap-southeast-2`                                                   |
-| `EC2_INSTANCE_ID`          | variable | `i-0bc1179bb147e01bb`                                               |
-| `VITE_SENTRY_ENVIRONMENT`  | variable | *(skipped for now, see below)*                                     |
+| Name                      | Kind     | Value                                            |
+| ------------------------- | -------- | ------------------------------------------------ |
+| `AWS_DEPLOY_ROLE_ARN`     | secret   | `arn:aws:iam::798256686602:role/deskwise-deploy` |
+| `VITE_SENTRY_DSN`         | secret   | _(skipped for now, see below)_                   |
+| `AWS_REGION`              | variable | `ap-southeast-2`                                 |
+| `EC2_INSTANCE_ID`         | variable | `i-0bc1179bb147e01bb`                            |
+| `VITE_SENTRY_ENVIRONMENT` | variable | _(skipped for now, see below)_                   |
 
 **`VITE_SENTRY_DSN`/`VITE_SENTRY_ENVIRONMENT` deliberately left unset** —
 they're only used as client Docker build-args (`ci-cd.yml` lines 102-103);
@@ -359,4 +359,4 @@ aws ssm send-command \
 ```
 
 — as long as that SHA's images are still in ECR (no lifecycle policy prunes
-them yet, so they will be, until one's added).
+them yet, so they will be, until one's added)
