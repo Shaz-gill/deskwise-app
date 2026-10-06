@@ -28,8 +28,6 @@ to say `<ACCOUNT_ID>` / `<REGION>` / `<GITHUB_ORG>/<REPO>`:
   writing — re-check if the instance is ever stopped/started, since that
   rotates)
 - GitHub Actions deploy role ARN: `arn:aws:iam::798256686602:role/deskwise-deploy`
-  (named `deskwise-deploy`, not `deskwise-github-actions-deploy` as shown in
-  step 2's example commands below — created via console with this name instead)
 
 **Important deviation from step 5 below:** this instance already had the app
 manually deployed at `/home/ec2-user/deskwise-app/` (a full git checkout,
@@ -46,7 +44,9 @@ written below. Keep this in sync if that ever changes.
 Progress on this account, as of 2026-10-06:
 
 - [x] Step 1 — OIDC provider already existed on this account
-- [x] Step 2 — IAM role created (named `deskwise-deploy`)
+- [x] Step 2 — IAM role created (named `deskwise-deploy`); trust policy
+      required the `@ID`-suffixed `sub` pattern below, not the plain one —
+      see the gotcha note under step 2
 - [x] Step 3 — ECR repos created
 - [x] Step 4 — EC2 instance role updated (SSM + ECR-read attached to
       `deskwise-ec2-role`; confirmed instance shows Online in Fleet Manager)
@@ -94,7 +94,10 @@ only ref the `deploy` job ever runs on:
                "token.actions.githubusercontent.com:aud": "sts.amazonaws.com"
             },
             "StringLike": {
-               "token.actions.githubusercontent.com:sub": "repo:Shaz-gill/deskwise-app:ref:refs/heads/master"
+               "token.actions.githubusercontent.com:sub": [
+                  "repo:Shaz-gill/deskwise-app:ref:refs/heads/master",
+                  "repo:Shaz-gill@*/deskwise-app@*:ref:refs/heads/master"
+               ]
             }
          }
       }
@@ -102,9 +105,23 @@ only ref the `deploy` job ever runs on:
 }
 ```
 
+**Gotcha hit on this account:** the first version of this trust policy used
+only the plain `repo:Shaz-gill/deskwise-app:ref:refs/heads/master` pattern
+and got `AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity`
+on every run. CloudTrail (`Event history`, filter `AssumeRoleWithWebIdentity`)
+showed the real `sub` claim GitHub sends is
+`repo:Shaz-gill@181646995/deskwise-app@1337083899:ref:refs/heads/master` —
+GitHub now embeds immutable numeric IDs for the account and repo alongside
+their names. The second pattern above (`@*` right after each name) matches
+that format; the `@` anchor makes it safe from accidentally matching an
+unrelated account/repo, since `@` can't appear mid-name. The Gameverse
+project's role instead hardcodes the literal IDs with `StringEquals` (no
+wildcard) — either approach works, but the wildcard version here tolerates
+GitHub changing the ID format again without needing another trust-policy
+edit.
+
 Permissions policy — ECR push for exactly the two repos this project uses,
-plus SSM to kick off the deploy script on the one instance (replace
-`<INSTANCE_ID>` with the real EC2 instance ID):
+plus SSM to kick off the deploy script on the one instance:
 
 ```json
 {
@@ -159,15 +176,15 @@ note its ARN — it's the `AWS_DEPLOY_ROLE_ARN` secret below.
 
 ```bash
 aws iam create-role \
-   --role-name deskwise-github-actions-deploy \
+   --role-name deskwise-deploy \
    --assume-role-policy-document file://trust-policy.json
 
 aws iam put-role-policy \
-   --role-name deskwise-github-actions-deploy \
+   --role-name deskwise-deploy \
    --policy-name deskwise-deploy-permissions \
    --policy-document file://permissions-policy.json
 
-aws iam get-role --role-name deskwise-github-actions-deploy \
+aws iam get-role --role-name deskwise-deploy \
    --query 'Role.Arn' --output text
 ```
 
@@ -180,14 +197,14 @@ aws iam get-role --role-name deskwise-github-actions-deploy \
 5. Click **Next**.
 6. Don't check any managed policy on the "Add permissions" screen — click
    **Next** again (permissions get added as an inline policy in step 13).
-7. Role name: `deskwise-github-actions-deploy`.
+7. Role name: `deskwise-deploy`.
 8. **Create role**, then click into the new role from the Roles list.
 9. **Trust relationships** tab → **Edit trust policy**.
 10.   Delete the contents and paste the trust policy JSON above.
 11.   **Update policy**.
 12.   **Permissions** tab → **Add permissions** dropdown → **Create inline policy**.
 13.   Click the **JSON** tab in the policy editor → paste the permissions
-      policy JSON above (with `<INSTANCE_ID>` replaced by the real instance ID).
+      policy JSON above.
 14.   **Next** → name it `deskwise-deploy-permissions` → **Create policy**.
 15.   Back on the role's **Summary** page, copy the **ARN** — that's the
       `AWS_DEPLOY_ROLE_ARN` secret for step 6.
@@ -359,4 +376,4 @@ aws ssm send-command \
 ```
 
 — as long as that SHA's images are still in ECR (no lifecycle policy prunes
-them yet, so they will be, until one's added)
+them yet, so they will be, until one's added).
