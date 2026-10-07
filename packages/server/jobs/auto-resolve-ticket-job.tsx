@@ -5,12 +5,26 @@ import {
    TicketReplySenderType,
    TicketStatus,
 } from '../generated/prisma/enums';
+import { render } from '@react-email/render';
+import { sanitizeHtml } from '../lib/sanitize-html';
+import { AiReplyContent } from '../lib/email/templates/ai-reply-content';
 import { getAiAssistantUser } from '../lib/tickets/ai-assistant-user';
 import { autoResolveTicket } from '../lib/tickets/auto-resolve-ticket';
 import { searchKnowledgeBase } from '../lib/knowledge-base/search-knowledge-base';
 import { boss } from '../lib/queue';
 import { Sentry } from '../lib/sentry';
 import { SEND_REPLY_EMAIL_QUEUE } from './send-reply-email-job';
+
+// autoResolveTicket() returns plain text (blank-line-separated
+// paragraphs) — render it through the same react-email component
+// pipeline as the rest of the app's templating (AiReplyContent), rather
+// than hand-building an HTML string, so bodyHtml isn't left null and the
+// branded reply template still applies on this send path. Still run
+// through sanitizeHtml() for consistency with every other bodyHtml
+// write, even though react-email's JSX already escapes the text content.
+async function plainTextToHtml(text: string): Promise<string> {
+   return sanitizeHtml(await render(<AiReplyContent text={text} />));
+}
 
 // Queue name shared between the producer (routes/tickets.ts's inbound-email
 // webhook, create-ticket branch only) and this worker.
@@ -103,6 +117,11 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                     });
 
             if (canResolve && reply) {
+               // Rendered outside the transaction below, same reasoning
+               // as the email enqueue further down: keep the DB
+               // transaction free of anything that doesn't touch the DB.
+               const replyHtml = await plainTextToHtml(reply);
+
                // Returns the created reply's id (or undefined if the
                // guarded transition below was skipped) so the email
                // enqueue after the transaction commits knows whether
@@ -121,6 +140,7 @@ export async function registerAutoResolveTicketWorker(): Promise<void> {
                   const createdReply = await tx.ticketReply.create({
                      data: {
                         body: reply,
+                        bodyHtml: replyHtml,
                         ticketId,
                         authorId: aiUser.id,
                         senderType: TicketReplySenderType.ai,
