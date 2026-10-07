@@ -4,7 +4,7 @@
 
 ### AI-Powered Support Ticket Management System
 
-Support emails become tickets that are auto-classified, summarized, and given AI-suggested replies grounded in a real retrieval-augmented knowledge base — with a full management interface for agents and admins.
+Support emails become tickets that are auto-classified, summarized, and either auto-resolved by AI — grounded in a real retrieval-augmented knowledge base — or left for an agent, who gets AI summaries and AI-polished replies that stay in their own voice, all backed by a full management interface for agents and admins.
 
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
@@ -12,8 +12,10 @@ Support emails become tickets that are auto-classified, summarized, and given AI
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Prisma_7-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org)
 [![LangChain](https://img.shields.io/badge/LangChain-OpenAI-1C3C3C?logo=langchain&logoColor=white)](https://www.langchain.com)
 [![Pinecone](https://img.shields.io/badge/Pinecone-Vector_DB-000000?logoColor=white)](https://www.pinecone.io)
+[![AWS](https://img.shields.io/badge/AWS-Cloud-FF9900?logoColor=white)](https://aws.amazon.com)
 [![Sentry](https://img.shields.io/badge/Sentry-Error_Tracking-362D59?logo=sentry&logoColor=white)](https://sentry.io)
 [![Bun](https://img.shields.io/badge/Bun-Workspaces-000000?logo=bun&logoColor=white)](https://bun.sh)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 </div>
 
@@ -59,6 +61,12 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 
 ![Ticket Detail](/docs/screenshots/ticket-detail.png)
 
+### Reply Email (as received)
+
+![Reply Email](/docs/screenshots/received-email.png)
+
+_The branded [React Email](https://react.email) template every outbound reply — human agent or AI auto-resolution — renders through before being sent via SES._
+
 ### Knowledge Base (RAG document management)
 
 ![Knowledge Base](/docs/screenshots/knowledge-base.png)
@@ -75,7 +83,7 @@ It's a full-stack TypeScript monorepo: an Express API backed by Postgres/Prisma,
 - Ticket detail view with a threaded reply history
 - Assignment to agents, status transitions (Open → Resolved → Closed)
 - Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates. The endpoint is secret-protected and works today for manual/test calls; a real AWS-native inbound pipeline in front of it (SES receipt rule → S3 → Lambda parsing the raw MIME) is planned but not yet built — see [Roadmap](#roadmap)
-- Outbound email sending via AWS SES — every agent reply and AI auto-resolution reply is emailed to the customer, off the request path via a pg-boss job
+- Outbound email sending via AWS SES, rendered through a branded [React Email](https://react.email) template — every agent reply and AI auto-resolution reply is emailed to the customer, off the request path via a pg-boss job
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
 
@@ -145,11 +153,12 @@ The core architectural rule: **any request that would call an LLM or a vector da
 - **Soft delete over hard delete.** Deleting a user never removes the row — it sets `deletedAt`, revokes every session, and frees the email address for reuse by overwriting it, so ticket history stays intact for anyone who worked a ticket in the past.
 - **Knowledge-base storage is S3 with a local-disk fallback, not a hard dependency on either.** `lib/knowledge-base/storage.ts` picks its backend once, at module load, from whether `KNOWLEDGE_BASE_S3_BUCKET` is set: S3 when it is, otherwise local disk (gitignored, the original and still-simplest option for running without AWS at all). `KnowledgeDoc.path` is treated as an opaque handle (an S3 key or a local path) everywhere downstream — never read or constructed directly outside this module.
 - **Outbound email is a direct AWS SES call, not LangChain.** The LangChain-only rule above is scoped to AI/LLM access — SES is a transactional email provider, so `lib/email/send-email.ts` calls `@aws-sdk/client-sesv2` directly, the same way `lib/knowledge-base/pinecone.ts` calls the Pinecone SDK directly. Sending is always handed to the `send-reply-email` pg-boss job rather than done inline, so neither an agent's reply submission nor the auto-resolve job ever blocks on SES.
+- **Reply emails are templated with React Email, not hand-built HTML strings.** Every outbound reply is wrapped in a branded template (`lib/email/templates/reply-email.tsx`) before being handed to SES. A human agent's reply already has rich-text `bodyHtml` from the client's editor; the AI auto-resolve job's reply doesn't (it's plain text from the model), so it's rendered into HTML through its own React Email component first, rather than string-concatenating `<p>` tags by hand.
 - **Error tracking covers more than the request/response path.** Sentry (`@sentry/node` server-side, `@sentry/react` client-side) is wired up beyond the automatic cases (uncaught exceptions, unhandled promise rejections, Express route errors, React render crashes via a top-level `Sentry.ErrorBoundary`). A lot of this codebase deliberately catches an error, logs it, and keeps going instead of letting it bubble up — a failed job-enqueue, auto-resolve's fallback-to-`open` catch, a pg-boss worker that intentionally rethrows so pg-boss owns retry/backoff — and each of those sites calls `Sentry.captureException(err)` explicitly, since Sentry's automatic integrations would never otherwise see them. Both DSNs are optional; `Sentry.init()` silently no-ops without one, so it's safe to leave configured in every environment including local dev.
 
 ### Auto-resolution, in plain English
 
-Think of it like a mailroom with a small robot helper. Every new ticket gets a secret, invisible stamp — `NEW` — until the robot picks it up and stamps it `PROCESSING` while it thinks. Nobody sees a ticket while it wears either stamp. The robot searches the team's own rulebook (the knowledge base) for pages about the question. If it finds a clear, complete answer, it writes a reply, signs it "Customer Support," and stamps the ticket `RESOLVED` — done, no human needed. If it can't find a good answer, or anything goes wrong, it just stamps the ticket `OPEN` and hands it to a human agent, exactly as if it had never tried.
+Think of it like a mailroom with a small robot helper. Every new ticket gets a secret, invisible stamp — `NEW` — until the robot picks it up and stamps it `PROCESSING` while it thinks. Nobody sees a ticket while it wears either stamp. The robot doesn't just skim the team's rulebook (the knowledge base) — it turns the customer's question into a vector and searches for the rulebook pages that are the closest match, held as embeddings in Pinecone. That's the "retrieval" half of RAG. It then hands only those exact pages to a second robot that writes the reply, under one strict rule: answer only from what's written on those pages, never from outside knowledge or a guess. If those pages fully and confidently answer the question, it writes the reply, signs it "Customer Support," and stamps the ticket `RESOLVED` — done, no human needed. If the pages don't cover it, or anything goes wrong, it just stamps the ticket `OPEN` and hands it to a human agent, exactly as if it had never tried. (See [How the RAG pipeline works](#how-the-rag-pipeline-works) below for the full mechanics.)
 
 ```
         email arrives
@@ -161,18 +170,32 @@ Think of it like a mailroom with a small robot helper. Every new ticket gets a s
          PROCESSING -------- still hidden, robot is thinking
               |
               v
-      search the knowledge base
+      turn the question into
+     a vector (OpenAI embedding)
               |
-     +------------------+
-     |                  |
-     v                  v
-found an answer    couldn't find one
-     |                  |
-     v                  v
- RESOLVED              OPEN
-(AI wrote a reply)  (needs a human)
-     |                  |
-     +--- visible to agents now ---+
+              v
+     find the closest-matching
+    rulebook pages (similarity
+      search against Pinecone)
+              |
+              v
+   hand only those exact pages to
+  the writer robot, with one rule:
+    answer from them, nothing else
+              |
+     +----------------------+
+     |                      |
+     v                      v
+the pages fully         the pages don't
+ answer it               cover it
+     |                      |
+     v                      v
+ RESOLVED                  OPEN
+(AI wrote a reply,      (needs a human)
+ grounded in those
+   exact pages)
+     |                      |
+     +---- visible to agents now ----+
 ```
 
 ### Ticket classification, in plain English
@@ -253,13 +276,84 @@ Deskwise's knowledge base is a complete retrieval-augmented generation loop — 
 
 **1. Ingestion — turning a document into searchable vectors.** When an admin uploads a policy document (`POST /api/knowledge-docs`), the file is saved and a `KnowledgeDoc` row is created as `processing`, then handed to a pg-boss job so the upload request returns immediately instead of blocking on extraction/embedding. The worker (`jobs/ingest-document-job.ts` → `lib/knowledge-base/ingest-document.ts`) extracts plain text, splits it into overlapping ~1000-character chunks, embeds each chunk with `text-embedding-3-small`, and upserts the vectors into Pinecone (`@langchain/pinecone`'s `PineconeStore`) — each one tagged with its source document and chunk index. The `KnowledgeDoc` row flips to `ready` (or `failed`, with the error saved) once that finishes.
 
-**2. Retrieval + generation — answering a ticket from those vectors.** When a new support ticket arrives (`POST /api/tickets/inbound-email`), it's enqueued onto the `auto-resolve-ticket` job without blocking the webhook response (`jobs/auto-resolve-ticket-job.ts`). That job:
+**2. Retrieval + generation — answering a ticket from those vectors.** When a new support ticket arrives (`POST /api/tickets/inbound-email`), it's enqueued onto the `auto-resolve-ticket` job without blocking the webhook response (`jobs/auto-resolve-ticket-job.tsx`). That job:
 
 1. Embeds the ticket's subject + body with the same embedding model and runs a similarity search against Pinecone (`lib/knowledge-base/search-knowledge-base.ts`) to pull back the top-K most relevant chunks across every ingested document — the read-side counterpart to the ingestion pipeline above.
 2. Hands those chunks to an LLM (`lib/tickets/auto-resolve-ticket.ts`) with a strict instruction: answer _only_ from the retrieved excerpts, never from outside knowledge, and say so honestly (`canResolve: false`) if they don't fully cover the question. This grounding step is what stops the model from confidently inventing a shipping or refund policy that doesn't exist.
 3. If the model is confident the excerpts fully answer the ticket, it drafts a complete, ready-to-send email — greeting, grounded answer, "Customer Support" sign-off — which is posted as a reply from a synthetic AI Assistant account, and the ticket is marked `resolved`. If not, or if anything in the pipeline fails (empty knowledge base, a Pinecone or OpenAI error), the ticket is simply left `open` for a human, exactly as if auto-resolution had never been attempted.
 
 This read path only ever runs once, at ticket creation — a follow-up email to an already-open ticket reuses that ticket instead of re-triggering resolution.
+
+### AWS Services Used
+
+Deskwise's AWS footprint is deliberately small — a handful of services doing one job each, not a sprawling architecture:
+
+| Service | Used For | Notes |
+| --- | --- | --- |
+| **EC2** | Hosts the running app — a single instance running `postgres` + `app` + `web` (Caddy) via Docker Compose | Not ECS/Fargate or RDS — a deliberate cost/simplicity trade-off for this demo; see [Roadmap](#roadmap) |
+| **ECR** | Stores the `deskwise-server` / `deskwise-client` Docker images CI builds on every push to `master` | Tagged by both commit SHA and `latest` |
+| **IAM** | A deploy role GitHub Actions assumes via OIDC, scoped to just ECR push + SSM `send-command` | No long-lived AWS access keys stored as GitHub secrets |
+| **SSM (Systems Manager)** | GitHub Actions runs the EC2 instance's `/opt/deskwise/deploy.sh` remotely via `aws ssm send-command` | No SSH key to manage or rotate — just the SSM agent + the IAM role above |
+| **SES** | Sends every outbound reply email, agent and AI auto-resolution alike | Optional — unconfigured locally, `sendEmail()` logs and skips instead of failing (see [Getting Started](#getting-started)) |
+| **S3** | Optional backend for knowledge-base document storage | Falls back to local disk (`knowledge-base/`) when `KNOWLEDGE_BASE_S3_BUCKET` is unset |
+
+### CI/CD pipeline, in plain English
+
+Same idea as the robots above, except the "ticket" is a code change and the "mailroom" is GitHub Actions. On every push to `master`, Actions builds and ships the change itself — nobody runs deploy commands by hand, and it never holds a raw SSH key or a long-lived AWS credential to do it.
+
+```
+      git push to master
+              |
+              v
+       GitHub Actions
+              |
+              v
+   prettier check + typecheck
+      + build the client
+              |
+         did that pass?
+              |
+      +-------+-------+
+      |               |
+     no               yes
+      |               |
+      v               v
+  deploy never    assume an IAM role
+    runs            via GitHub OIDC
+ (job just fails)  (no long-lived keys)
+                          |
+                          v
+                   log in to ECR
+                          |
+                +---------+---------+
+                |                   |
+                v                   v
+          build + push        build + push
+          server image        client image
+                |                   |
+                +---------+---------+
+                          |
+                          v
+            aws ssm send-command
+          (no SSH key — just IAM
+           + the SSM agent on EC2)
+                          |
+                          v
+           EC2 runs /opt/deskwise/
+          deploy.sh: docker compose
+              pull, then up -d
+                          |
+                +---------+---------+
+                |                   |
+                v                   v
+            succeeded             failed
+                |                   |
+                v                   v
+          Actions job          Actions job fails
+           succeeds          (deploy.sh's stdout/
+                               stderr surfaced in
+                               the Actions log)
+```
 
 ## Tech Stack
 
@@ -291,7 +385,7 @@ shadcn/ui component system, built on Base UI primitives · React Hook Form + Zod
 [![Prisma](https://img.shields.io/badge/Prisma_7-2D3748?logo=prisma&logoColor=white)](https://www.prisma.io)
 [![Zod](https://img.shields.io/badge/Zod-4-3E67B1?logo=zod&logoColor=white)](https://zod.dev)
 
-Better Auth (session-based) · pg-boss (Postgres-backed job queue) · Helmet · express-rate-limit · DOMPurify + jsdom · multer · AWS SES (outbound email) · Sentry (error tracking)
+Better Auth (session-based) · pg-boss (Postgres-backed job queue) · Helmet · express-rate-limit · DOMPurify + jsdom · multer · AWS SES + React Email (outbound email, branded templates) · Sentry (error tracking)
 
 </td>
 </tr>
@@ -463,23 +557,23 @@ The client runs at `http://localhost:5173`, the API at `http://localhost:3000`.
 desky/
 ├── packages/
 │   ├── server/              # Express 5 API
-│   │   ├── routes/          # tickets, users, knowledge-docs
-│   │   ├── lib/              # tickets/ (AI features), knowledge-base/ (RAG pipeline)
-│   │   ├── jobs/             # pg-boss workers (classify-ticket, auto-resolve-ticket, ingest-document, send-reply-email)
-│   │   ├── middleware/       # auth, rate limiting, error handling
-│   │   ├── prisma/           # schema, migrations, seed scripts
+│   │   ├── routes/      # tickets, users, knowledge-docs
+│   │   ├── lib/         # tickets/ (AI features), knowledge-base/ (RAG pipeline)
+│   │   ├── jobs/        # pg-boss workers (classify-ticket, auto-resolve-ticket, ingest-document, send-reply-email)
+│   │   ├── middleware/  # auth, rate limiting, error handling
+│   │   ├── prisma/      # schema, migrations, seed scripts
 │   │   └── Dockerfile
 │   ├── client/               # React 19 SPA
 │   │   ├── src/
-│   │   │   ├── pages/          # route-level views
-│   │   │   ├── components/     # tickets/, users/, knowledge-base/, dashboard/, ui/ (shadcn)
+│   │   │   ├── pages/        # route-level views
+│   │   │   ├── components/   # tickets/, users/, knowledge-base/, dashboard/, ui/ (shadcn)
 │   │   │   └── hooks/
 │   │   └── Dockerfile        # final stage is Caddy, not Node
 │   └── core/                 # shared Zod schemas + const-object enums
-├── .github/workflows/       # CI (lint/build) + CD (build images, push to ECR, deploy to EC2)
-├── docker-compose.yml       # postgres + app + web (Caddy), the single-EC2 deploy target
+├── .github/workflows/  # CI (lint/build) + CD (build images, push to ECR, deploy to EC2)
+├── docker-compose.yml  # postgres + app + web (Caddy), the single-EC2 deploy target
 ├── Caddyfile
-└── docs/screenshots/        # README screenshots
+└── docs/screenshots/   # README screenshots
 ```
 
 ## Development Process
@@ -502,4 +596,4 @@ The goal wasn't "AI wrote this app" — it's using AI the way a competent engine
 
 ## License
 
-No license has been set for this repository yet — it's currently a personal/portfolio project.
+[MIT](LICENSE)
