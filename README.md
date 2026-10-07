@@ -6,6 +6,10 @@
 
 Support emails become tickets that are auto-classified, summarized, and either auto-resolved by AI — grounded in a real retrieval-augmented knowledge base — or left for an agent, who gets AI summaries and AI-polished replies that stay in their own voice, all backed by a full management interface for agents and admins.
 
+**[🔗 Live Demo](https://deskwise.shahzadtariq.com)** — demo credentials are shown right on the login page
+
+Want to see the real pipeline end to end? Email `support@shahzadtariq.com` or `deskwise.support@shahzadtariq.com` with a support-style question and it'll land as a real ticket within seconds — auto-resolved with a reply if the seeded knowledge base covers it, left open for an agent if not. (It's a shared public demo, so anything sent in is visible to anyone using the demo login above — don't send anything private.)
+
 [![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Express](https://img.shields.io/badge/Express-5-000000?logo=express&logoColor=white)](https://expressjs.com)
@@ -82,7 +86,7 @@ _The branded [React Email](https://react.email) template every outbound reply �
 - Paginated, sortable, filterable ticket list (by subject, status, category)
 - Ticket detail view with a threaded reply history
 - Assignment to agents, status transitions (Open → Resolved → Closed)
-- Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates. The endpoint is secret-protected and works today for manual/test calls; a real AWS-native inbound pipeline in front of it (SES receipt rule → S3 → Lambda parsing the raw MIME) is planned but not yet built — see [Roadmap](#roadmap)
+- Inbound-email webhook intake — automatically dedupes into an existing open ticket for the same sender + subject instead of creating duplicates. Fed by a real AWS-native pipeline, not just manual/test calls: an SES receipt rule on a live domain routes incoming mail through S3 and a Lambda that parses the raw MIME and posts to the secret-protected webhook. Try it yourself — email addresses are at the top of this page, under Live Demo
 - Outbound email sending via AWS SES, rendered through a branded [React Email](https://react.email) template — every agent reply and AI auto-resolution reply is emailed to the customer, off the request path via a pg-boss job
 
 **AI-Powered Features** (all via [LangChain](https://www.langchain.com), never a provider SDK called directly — see [Architecture](#architecture))
@@ -294,8 +298,9 @@ Deskwise's AWS footprint is deliberately small — a handful of services doing o
 | **ECR** | Stores the `deskwise-server` / `deskwise-client` Docker images CI builds on every push to `master` | Tagged by both commit SHA and `latest` |
 | **IAM** | A deploy role GitHub Actions assumes via OIDC, scoped to just ECR push + SSM `send-command` | No long-lived AWS access keys stored as GitHub secrets |
 | **SSM (Systems Manager)** | GitHub Actions runs the EC2 instance's `/opt/deskwise/deploy.sh` remotely via `aws ssm send-command` | No SSH key to manage or rotate — just the SSM agent + the IAM role above |
-| **SES** | Sends every outbound reply email, agent and AI auto-resolution alike | Optional — unconfigured locally, `sendEmail()` logs and skips instead of failing (see [Getting Started](#getting-started)) |
-| **S3** | Optional backend for knowledge-base document storage | Falls back to local disk (`knowledge-base/`) when `KNOWLEDGE_BASE_S3_BUCKET` is unset |
+| **SES** | Sends every outbound reply email (agent + AI auto-resolution), and receives inbound mail in production via a receipt rule on a live domain | Outbound is optional locally — unconfigured, `sendEmail()` logs and skips instead of failing (see [Getting Started](#getting-started)). Inbound receiving is always on in production |
+| **S3** | Two separate jobs: optional backend for knowledge-base documents, and the landing zone for raw inbound email before Lambda parses it | KB storage falls back to local disk when `KNOWLEDGE_BASE_S3_BUCKET` is unset; the inbound-mail bucket is a fixed part of production, not optional |
+| **Lambda** | Parses the raw MIME email SES drops in S3 and POSTs it to the `WEBHOOK_SECRET`-protected `/api/tickets/inbound-email` endpoint | Deployed directly, source isn't checked into this repo |
 
 ### CI/CD pipeline, in plain English
 
@@ -590,7 +595,6 @@ The goal wasn't "AI wrote this app" — it's using AI the way a competent engine
 
 - ✍️ Agent-facing suggested-reply drafting (an AI-written first draft for a human to review, as opposed to polishing an agent's own draft or full auto-resolution)
 - 🧵 Message/thread IDs for inbound email — today's dedupe (sender + subject + open-status) works, but a real `Message-ID` header is available and unused; would also let a reply to an already-open ticket append to the thread instead of just returning the existing ticket untouched
-- 📬 Real inbound-email pipeline — `/api/tickets/inbound-email` only accepts manual/test calls today; wiring up an AWS SES receipt rule → S3 → Lambda in front of it (so real email actually reaches the app) hasn't been built yet
 - 🗄️ Managed database (RDS) instead of Postgres co-located in a container on the same instance — the current production setup has no automated backups
 - 🏗️ Infrastructure as code (AWS CDK) for the OIDC provider, IAM deploy role, and ECR repos that CI/CD depends on — set up by hand for now
 

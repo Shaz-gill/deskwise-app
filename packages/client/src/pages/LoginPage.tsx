@@ -1,6 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { loginSchema, type LoginFormValues } from 'core';
-import { KeyRound, Mail } from 'lucide-react';
+import { Check, Copy, KeyRound, Mail } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
@@ -24,10 +24,30 @@ import {
 import { Input } from '../components/ui/input';
 import { authClient } from '../lib/auth-client';
 
+const DEMO_EMAIL = 'admin@deskwise.com';
+const DEMO_PASSWORD = 'password123';
+
 export function LoginPage() {
    const navigate = useNavigate();
    const { refetch } = authClient.useSession();
    const [serverError, setServerError] = useState<string | null>(null);
+   const [copiedField, setCopiedField] = useState<'email' | 'password' | null>(
+      null
+   );
+
+   async function copyToClipboard(value: string, field: 'email' | 'password') {
+      try {
+         await navigator.clipboard.writeText(value);
+      } catch {
+         // Clipboard API can reject (denied permission, non-secure context,
+         // older browser) — the credentials are still visible as plain text
+         // right there to select manually, so just skip the "copied" feedback
+         // instead of leaving an unhandled rejection.
+         return;
+      }
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1500);
+   }
 
    const {
       register,
@@ -77,14 +97,32 @@ export function LoginPage() {
                   <p className="font-medium text-foreground">
                      Demo credentials
                   </p>
-                  <p className="flex items-center gap-1.5">
-                     <Mail className="size-3.5" />
-                     <span className="font-mono">admin@deskwise.com</span>
-                  </p>
-                  <p className="flex items-center gap-1.5">
-                     <KeyRound className="size-3.5" />
-                     <span className="font-mono">password123</span>
-                  </p>
+                  <button
+                     type="button"
+                     onClick={() => copyToClipboard(DEMO_EMAIL, 'email')}
+                     className="flex w-full items-center gap-1.5 py-0.5 text-left hover:text-foreground"
+                  >
+                     <Mail className="size-3.5 shrink-0" />
+                     <span className="font-mono">{DEMO_EMAIL}</span>
+                     {copiedField === 'email' ? (
+                        <Check className="size-3 shrink-0 text-primary" />
+                     ) : (
+                        <Copy className="size-3 shrink-0 opacity-50" />
+                     )}
+                  </button>
+                  <button
+                     type="button"
+                     onClick={() => copyToClipboard(DEMO_PASSWORD, 'password')}
+                     className="flex w-full items-center gap-1.5 py-0.5 text-left hover:text-foreground"
+                  >
+                     <KeyRound className="size-3.5 shrink-0" />
+                     <span className="font-mono">{DEMO_PASSWORD}</span>
+                     {copiedField === 'password' ? (
+                        <Check className="size-3 shrink-0 text-primary" />
+                     ) : (
+                        <Copy className="size-3 shrink-0 opacity-50" />
+                     )}
+                  </button>
                </div>
                <form onSubmit={handleSubmit(onSubmit)} noValidate>
                   <FieldGroup>
